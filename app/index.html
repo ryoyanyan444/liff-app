@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Chat Assistant - Trợ lý người Việt tại Nhật</title>
+    <link rel="stylesheet" href="vietnam-style.css">
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+</head>
+<body>
+    <div class="container">
+        <!-- Phần header với thông tin người dùng -->
+        <div class="header">
+            <div class="profile-section">
+                <div id="profile-avatar" class="avatar">👤</div>
+                <div class="profile-info">
+                    <div id="profile-name" class="name">Đang tải...</div>
+                    <div id="user-plan" class="plan-badge">Free</div>
+                </div>
+            </div>
+            <div class="usage-section">
+                <div class="usage-item">
+                    <span class="usage-label">Hôm nay:</span>
+                    <span id="today-count" class="usage-value">0</span>
+                    <span class="usage-limit">/ 10</span>
+                </div>
+                <div class="usage-item">
+                    <span class="usage-label">Vision:</span>
+                    <span id="vision-count" class="usage-value">0</span>
+                    <span class="usage-limit">/ 0</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Giới thiệu bot -->
+        <div class="section">
+            <h2>🇻🇳 Trợ lý AI cho người Việt tại Nhật</h2>
+            <p class="description">
+                AI Chat Assistant hỗ trợ bạn trong cuộc sống hàng ngày tại Nhật Bản. 
+                Tất cả câu trả lời đều bằng tiếng Việt, giúp bạn dễ hiểu và an tâm hơn.
+            </p>
+        </div>
+
+        <!-- Hướng dẫn sử dụng -->
+        <div class="section">
+            <h3>📋 Cách sử dụng</h3>
+            <div class="feature-list">
+                <div class="feature-item">
+                    <span class="feature-icon">💬</span>
+                    <div class="feature-text">
+                        <strong>Hỏi đáp thông thường</strong>
+                        <p>Gửi tin nhắn văn bản bất kỳ</p>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">📸</span>
+                    <div class="feature-text">
+                        <strong>Phân tích hình ảnh</strong>
+                        <p>Gửi ảnh để AI đọc và giải thích (Vision API)</p>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">📄</span>
+                    <div class="feature-text">
+                        <strong>Giải thích văn bản Nhật</strong>
+                        <p>Chụp giấy tờ, thông báo để dịch và giải nghĩa</p>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">🔄</span>
+                    <div class="feature-text">
+                        <strong>Reset hội thoại</strong>
+                        <p>Nhấn nút "🔄 リセット" để bắt đầu lại</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 料金プラン -->
+        <div class="section pricing-section">
+            <h3>💎 Gói dịch vụ Premium</h3>
+            
+            <!-- 無料トライアル告知 -->
+            <div class="trial-notice">
+                <p><strong>🎉 3日間無料トライアル実施中！いつでもキャンセル可能です</strong></p>
+            </div>
+
+            <!-- プラン選択 -->
+            <div class="plan-selector">
+                <label class="plan-option recommended">
+                    <input type="radio" name="plan" value="3month" checked>
+                    <div class="plan-content">
+                        <div class="plan-badge-recommended">おすすめ</div>
+                        <div class="plan-title">3ヶ月プラン</div>
+                        <div class="plan-price-main">¥690<span class="price-unit">/月</span></div>
+                        <div class="plan-price-sub">3ヶ月 ¥2,070</div>
+                    </div>
+                </label>
+
+                <label class="plan-option">
+                    <input type="radio" name="plan" value="monthly">
+                    <div class="plan-content">
+                        <div class="plan-title">月間プラン</div>
+                        <div class="plan-price-main">¥780<span class="price-unit">/月</span></div>
+                    </div>
+                </label>
+            </div>
+
+            <!-- プレミアム特典 -->
+            <div class="premium-features">
+                <h4>✨ Premium特典</h4>
+                <ul>
+                    <li>✅ トーク毎日無制限</li>
+                    <li>✅ アニメ画像生成毎日30枚</li>
+                    <li>✅ 会話履歴を保存</li>
+                    <li>✅ 優先サポート</li>
+                </ul>
+            </div>
+
+            <!-- アップグレードボタン -->
+            <button id="upgrade-btn" class="upgrade-btn-new">
+                Premium にアップグレード
+            </button>
+
+            <!-- フィードバック特典 -->
+            <div class="feedback-bonus">
+                <p>💬 <strong>フィードバック特典:</strong> ご意見をいただいた方に<span class="highlight-yellow">追加で3日間の無料期間</span>をプレゼント！</p>
+            </div>
+        </div>
+
+        <!-- よくある質問 -->
+        <div class="section faq-section">
+            <h3>❓ よくある質問</h3>
+            
+            <div class="faq-item">
+                <div class="faq-question">Q. 解約はできますか？</div>
+                <div class="faq-answer">
+                    A. いつでも解約が可能です。<br>
+                    解約した場合、解約手続きの次回決済時までご利用いただけます。<br>
+                    また、無料お試し期間中でも通常プランに変更可能ですので、ご気軽にお試しください。
+                </div>
+            </div>
+        </div>
+
+        <!-- 注意事項 -->
+        <div class="section terms-section">
+            <h3>⚠️ 注意事項</h3>
+            <ul class="terms-list">
+                <li>このサブスクリプションを開始すると、その時点からトーク毎日無制限、アニメ画像生成毎日30枚を利用できます。</li>
+                <li>無料トライアルは1度だけご利用いただけます。すでにご利用されたユーザー様は、3日間の無料期間の対象外となります。</li>
+                <li>無料トライアルのキャンセルは、申し込み日時から72時間を経過する前まで可能です。</li>
+                <li>無料トライアル終了後、プレミアムプランに自動更新されます。更新後のキャンセルはできません。</li>
+                <li>支払方法：Stripeにてお支払い頂きます。</li>
+                <li>支払料金：1ヶ月プラン ¥780、3ヶ月プラン ¥2,070</li>
+                <li>支払時期：各プランの更新日にお支払い頂きます。</li>
+            </ul>
+        </div>
+
+        <div class="footer">
+            <p>© 2024 AI Chat Assistant - Hỗ trợ người Việt tại Nhật</p>
+        </div>
+    </div>
+
+    <script src="vietnam-app.js"></script>
+</body>
+</html>

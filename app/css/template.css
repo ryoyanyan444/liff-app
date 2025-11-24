@@ -1,0 +1,170 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Sans', sans-serif;
+  background: #f5f5f5;
+  overflow-x: hidden;
+}
+
+/* タブナビゲーション */
+.tab-nav {
+  position: sticky;
+  top: 0;
+  background: white;
+  border-bottom: 1px solid #e0e0e0;
+  overflow-x: auto;
+  white-space: nowrap;
+  z-index: 100;
+  -webkit-overflow-scrolling: touch;
+}
+
+.tab-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.tab-list {
+  display: inline-flex;
+  padding: 12px 8px;
+  gap: 8px;
+}
+
+.tab-item {
+  padding: 8px 16px;
+  border-radius: 20px;
+  background: #f0f0f0;
+  color: #666;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.tab-item.active {
+  background: #06c755;
+  color: white;
+  font-weight: bold;
+}
+
+.tab-item:active {
+  transform: scale(0.95);
+}
+
+/* テンプレートリスト */
+.template-list {
+  padding: 16px;
+  padding-bottom: 40px;
+}
+
+.template-card {
+  background: white;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid #f0f0f0;
+}
+
+.template-card:hover {
+  box-shadow: 0 4px 8px rgba(0,0,0,0.12);
+}
+
+.template-card:active {
+  transform: scale(0.98);
+  background: #f9f9f9;
+}
+
+.template-label {
+  font-size: 16px;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 8px;
+}
+
+.template-message {
+  font-size: 14px;
+  color: #666;
+  line-height: 1.6;
+}
+
+/* カテゴリタイトル */
+.category-title {
+  font-size: 18px;
+  font-weight: bold;
+  color: #333;
+  margin: 24px 0 12px 0;
+  padding-left: 12px;
+  border-left: 4px solid #06c755;
+}
+
+.category-title:first-child {
+  margin-top: 8px;
+}
+
+/* ローディング */
+.loading {
+  text-align: center;
+  padding: 60px 20px;
+  color: #999;
+  font-size: 14px;
+}
+
+.loading::before {
+  content: "⏳";
+  display: block;
+  font-size: 40px;
+  margin-bottom: 16px;
+}
+
+/* エラー */
+.error {
+  text-align: center;
+  padding: 60px 20px;
+  color: #f44336;
+  font-size: 14px;
+}
+
+.error::before {
+  content: "⚠️";
+  display: block;
+  font-size: 40px;
+  margin-bottom: 16px;
+}
+
+/* 空 */
+.empty {
+  text-align: center;
+  padding: 60px 20px;
+  color: #999;
+  font-size: 14px;
+}
+
+.empty::before {
+  content: "📭";
+  display: block;
+  font-size: 40px;
+  margin-bottom: 16px;
+}
+
+/* レスポンシブ */
+@media (max-width: 360px) {
+  .tab-item {
+    font-size: 13px;
+    padding: 6px 12px;
+  }
+  
+  .template-label {
+    font-size: 15px;
+  }
+  
+  .template-message {
+    font-size: 13px;
+  }
+}

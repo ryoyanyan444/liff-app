@@ -1,0 +1,392 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background: #ffffff;  /* 白背景に変更 */
+    color: #333;
+    line-height: 1.6;
+}
+
+.container {
+    max-width: 600px;
+    margin: 0 auto;
+    background: white;
+    min-height: 100vh;
+}
+
+/* Header */
+.header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 20px;
+    border-radius: 0 0 20px 20px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.profile-section {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.avatar {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 30px;
+    overflow: hidden;
+}
+
+.avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.profile-info {
+    flex: 1;
+}
+
+.name {
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.plan-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    background: rgba(255,255,255,0.3);
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.usage-section {
+    display: flex;
+    gap: 20px;
+    padding: 15px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 10px;
+}
+
+.usage-item {
+    flex: 1;
+    text-align: center;
+}
+
+.usage-label {
+    display: block;
+    font-size: 12px;
+    opacity: 0.9;
+    margin-bottom: 5px;
+}
+
+.usage-value {
+    font-size: 24px;
+    font-weight: bold;
+}
+
+.usage-limit {
+    font-size: 14px;
+    opacity: 0.8;
+}
+
+/* Sections */
+.section {
+    padding: 20px;
+    border-bottom: 1px solid #eee;
+}
+
+.section h2 {
+    font-size: 20px;
+    margin-bottom: 10px;
+    color: #667eea;
+}
+
+.section h3 {
+    font-size: 18px;
+    margin-bottom: 15px;
+    color: #333;
+}
+
+.description {
+    color: #666;
+    line-height: 1.8;
+}
+
+/* Feature List */
+.feature-list {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.feature-item {
+    display: flex;
+    gap: 15px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 10px;
+    transition: transform 0.2s;
+}
+
+.feature-item:hover {
+    transform: translateX(5px);
+}
+
+.feature-icon {
+    font-size: 30px;
+    flex-shrink: 0;
+}
+
+.feature-text strong {
+    display: block;
+    color: #333;
+    margin-bottom: 5px;
+}
+
+.feature-text p {
+    color: #666;
+    font-size: 14px;
+}
+
+/* 料金プランセクション */
+.pricing-section {
+    background: #f8f9fa;
+}
+
+.trial-notice {
+    background: #fff9e6;
+    border-left: 4px solid #ffc107;
+    padding: 15px;
+    margin-bottom: 20px;
+    border-radius: 8px;
+}
+
+.trial-notice p {
+    margin: 0;
+    color: #856404;
+    font-size: 14px;
+}
+
+.trial-notice strong {
+    position: relative;
+}
+
+.trial-notice strong::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 8px;
+    background: #ffeb3b;
+    z-index: -1;
+    opacity: 0.5;
+}
+
+/* プラン選択 */
+.plan-selector {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.plan-option {
+    position: relative;
+    display: block;
+    padding: 20px;
+    background: white;
+    border: 2px solid #ddd;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.plan-option:hover {
+    border-color: #667eea;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+}
+
+.plan-option.recommended {
+    border-color: #667eea;
+    background: linear-gradient(135deg, #f8f9ff 0%, #ffffff 100%);
+}
+
+.plan-option input[type="radio"] {
+    position: absolute;
+    left: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+}
+
+.plan-content {
+    margin-left: 35px;
+}
+
+.plan-badge-recommended {
+    display: inline-block;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: bold;
+    margin-bottom: 8px;
+}
+
+.plan-title {
+    font-size: 18px;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 8px;
+}
+
+.plan-price-main {
+    font-size: 32px;
+    font-weight: bold;
+    color: #667eea;
+    line-height: 1;
+}
+
+.price-unit {
+    font-size: 16px;
+    color: #666;
+}
+
+.plan-price-sub {
+    font-size: 14px;
+    color: #666;
+    margin-top: 5px;
+}
+
+/* プレミアム特典 */
+.premium-features {
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+}
+
+.premium-features h4 {
+    font-size: 16px;
+    margin-bottom: 12px;
+    color: #333;
+}
+
+.premium-features ul {
+    list-style: none;
+    padding: 0;
+}
+
+.premium-features li {
+    padding: 8px 0;
+    color: #666;
+    font-size: 14px;
+}
+
+/* アップグレードボタン */
+.upgrade-btn-new {
+    width: 100%;
+    padding: 18px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    margin-bottom: 15px;
+}
+
+.upgrade-btn-new:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+}
+
+/* フィードバック特典 */
+.feedback-bonus {
+    background: #e8f4f8;
+    padding: 15px;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.feedback-bonus p {
+    margin: 0;
+    color: #333;
+    font-size: 14px;
+}
+
+.highlight-yellow {
+    background: linear-gradient(transparent 60%, #ffeb3b 60%);
+    padding: 2px 4px;
+    font-weight: bold;
+}
+
+/* FAQ */
+.faq-section {
+    background: white;
+}
+
+.faq-item {
+    margin-bottom: 20px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.faq-question {
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 10px;
+    font-size: 15px;
+}
+
+.faq-answer {
+    color: #666;
+    line-height: 1.8;
+    font-size: 14px;
+}
+
+/* 注意事項 */
+.terms-section {
+    background: #fff3cd;
+    border-left: 4px solid #ffc107;
+}
+
+.terms-list {
+    padding-left: 20px;
+    list-style: disc;
+}
+
+.terms-list li {
+    margin-bottom: 10px;
+    color: #856404;
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+/* Footer */
+.footer {
+    padding: 20px;
+    text-align: center;
+    color: #999;
+    font-size: 12px;
+}
