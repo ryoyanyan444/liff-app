@@ -211,6 +211,11 @@ function sendTemplate(templateId) {
 
 function setupEventListeners() {
   document.querySelectorAll('.tab-item').forEach(tab => {
+    // ✅ 初期選択を反映（ホームタブをアクティブに）
+    if (tab.dataset.category === currentCategory) {
+      tab.classList.add('active');
+    }
+    
     tab.addEventListener('click', () => {
       document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
       tab.classList.add('active');
