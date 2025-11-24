@@ -13,7 +13,7 @@ const CONFIG = {
 
 let allTemplates = [];
 let recentTemplates = [];
-let currentCategory = 'recent';
+let currentCategory = 'home';
 
 // ==========================================
 // LIFF初期化
