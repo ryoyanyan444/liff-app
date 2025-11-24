@@ -4,7 +4,7 @@
 
 const CONFIG = {
   LIFF_ID: '2008551240-vWN36gzR',  // ⭐ 既存のLIFF IDを一時的に使用
-  GAS_API_URL: 'https://script.google.com/macros/s/AKfycbyXXXXXXXXXXXXXX/exec'  // ⭐ あなたのGAS URL
+  GAS_API_URL: 'https://script.google.com/macros/s/AKfycbwDM80XlwPf9A2oj1OnqEK7vKwy2ry-3rfIAUrV1Ri3WyEasa1pbnaUcBCk7UCVQQ-Y/exec'  // ⭐ あなたのGAS URL
 };
 
 // ==========================================
