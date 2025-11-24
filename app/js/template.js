@@ -210,8 +210,12 @@ function sendTemplate(templateId) {
 // ==========================================
 
 function setupEventListeners() {
+   // ✅ まず全てのactiveクラスを削除
+  document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+  
+  // ✅ 各タブにイベントリスナーを設定
   document.querySelectorAll('.tab-item').forEach(tab => {
-    // ✅ 初期選択を反映（ホームタブをアクティブに）
+    // ✅ 初期選択を反映（currentCategoryと一致するタブをアクティブに）
     if (tab.dataset.category === currentCategory) {
       tab.classList.add('active');
     }
