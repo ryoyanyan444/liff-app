@@ -179,10 +179,10 @@ function attachCardListeners() {
 }
 
 // ==========================================
-// 送信
+// 送信（GAS経由）
 // ==========================================
 
-function sendTemplate(templateId) {
+async function sendTemplate(templateId) {
   const template = allTemplates.find(t => t.id === templateId);
   
   if (!template) {
@@ -190,19 +190,44 @@ function sendTemplate(templateId) {
     return;
   }
   
-  liff.sendMessages([{
-    type: 'text',
-    text: template.message
-  }])
-  .then(() => {
-    console.log('✅ Sent:', templateId);
-    addToRecent(templateId);
-    liff.closeWindow();
-  })
-  .catch(err => {
+  console.log('📤 Sending via GAS:', templateId);
+  
+  try {
+    // ⭐ ユーザーIDを取得
+    const profile = await liff.getProfile();
+    const userId = profile.userId;
+    
+    // ⭐ GAS経由でメッセージを送信
+    const response = await fetch(CONFIG.GAS_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        action: 'sendTemplate',
+        userId: userId,
+        message: template.message
+      })
+    });
+    
+    const result = await response.json();
+    
+    if (result.success) {
+      console.log('✅ Sent successfully');
+      addToRecent(templateId);
+      
+      // ⭐ 成功メッセージを表示してLIFFを閉じる
+      alert('✅ 送信完了！');
+      liff.closeWindow();
+    } else {
+      console.error('❌ Send failed:', result.error);
+      alert('❌ 送信に失敗しました');
+    }
+    
+  } catch (err) {
     console.error('❌ Send error:', err);
-    alert('送信に失敗しました');
-  });
+    alert('❌ 送信エラーが発生しました');
+  }
 }
 
 // ==========================================
