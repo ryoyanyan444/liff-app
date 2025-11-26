@@ -1,0 +1,20 @@
+{
+  "name": "liff-app-backend",
+  "version": "1.0.0",
+  "description": "LINE AI Chatbot with Stripe Integration",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vercel dev",
+    "build": "vercel build",
+    "deploy": "vercel --prod"
+  },
+  "dependencies": {
+    "@line/bot-sdk": "^8.0.0",
+    "openai": "^4.20.0",
+    "stripe": "^13.10.0",
+    "@supabase/supabase-js": "^2.38.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
