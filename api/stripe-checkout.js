@@ -24,11 +24,17 @@ module.exports = async (req, res) => {
   }
 
   try {
-    const { userId, priceId } = req.body;
+    // ⭐ planType を受け取る
+    const { userId, planType } = req.body;
 
-    if (!userId || !priceId) {
-      return res.status(400).json({ error: 'Missing userId or priceId' });
+    if (!userId || !planType) {
+      return res.status(400).json({ error: 'Missing userId or planType' });
     }
+
+    // ⭐ planType から priceId を決定
+    const priceId = planType === '3months' 
+      ? process.env.PRICE_ID_3MONTHS 
+      : process.env.PRICE_ID_1MONTH;
 
     // ユーザー情報取得
     const { data: user, error: userError } = await supabase
@@ -78,10 +84,16 @@ module.exports = async (req, res) => {
       }
     });
 
-    return res.status(200).json({ url: session.url });
+    return res.status(200).json({ 
+      success: true,  // ⭐ フロントエンドが期待している形式
+      url: session.url 
+    });
 
   } catch (error) {
     console.error('Stripe checkout error:', error);
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({ 
+      success: false,  // ⭐ エラー時も統一
+      error: error.message 
+    });
   }
 };
