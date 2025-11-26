@@ -1,7 +1,7 @@
-// ⚠️ 後で自分の値に書き換える！
+// ✅ 新しいコード（Vercel API）
 const CONFIG = {
-    LIFF_ID: '2008551240-vWN36gzR',  // ← 後でLINE Developersから取得したLIFF IDに書き換える
-    GAS_API_URL: 'https://script.google.com/macros/s/AKfycbz2Wmya8_CMhayU16QK-qD7PUBH1FoYnicVmOg_0mXO-QlIi8bG-G0ZtH4ov55TIB80/exec'  // ← 自分のGAS APIのURLに書き換える（例: https://script.google.com/macros/s/XXXXX/exec）
+    LIFF_ID: '2008551240-vWN36gzR',
+    API_URL: 'https://api.ai-chat-jp.com/api'  // ⭐ Vercel API
 };
 
 // LIFF初期化
@@ -40,7 +40,7 @@ function updateProfileUI(profile) {
 // GAS APIからユーザーデータ取得
 async function fetchUserData(userId) {
     try {
-        const response = await fetch(`${CONFIG.GAS_API_URL}?action=getUserInfo&userId=${userId}`);
+        const response = await fetch(`${CONFIG.API_URL}?action=getUserInfo&userId=${userId}`);
         const data = await response.json();
         
         if (data.success) {
@@ -85,7 +85,7 @@ function updateUsageUI(user) {
                     portalBtn.disabled = true;
                     portalBtn.textContent = '読み込み中...';
                     
-                    const response = await fetch(CONFIG.GAS_API_URL, {
+                    const response = await fetch(CONFIG.API_URL, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
@@ -142,7 +142,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 upgradeBtn.textContent = '処理中...';
                 
                 // GAS APIでStripe Checkoutセッションを作成
-                const response = await fetch(CONFIG.GAS_API_URL, {
+                const response = await fetch(CONFIG.API_URL, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
