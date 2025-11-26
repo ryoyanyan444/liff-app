@@ -1,7 +1,7 @@
-// ✅ 新しいコード（Vercel API）
+// Vercel API設定
 const CONFIG = {
     LIFF_ID: '2008551240-vWN36gzR',
-    API_URL: 'https://api.ai-chat-jp.com/api'  // ⭐ Vercel API
+    API_URL: 'https://api.ai-chat-jp.com/api'
 };
 
 // LIFF初期化
@@ -18,7 +18,7 @@ async function initializeLIFF() {
         const profile = await liff.getProfile();
         updateProfileUI(profile);
         
-        // GAS APIからユーザーデータ取得
+        // Vercel APIからユーザーデータ取得
         await fetchUserData(profile.userId);
         
     } catch (error) {
@@ -37,10 +37,10 @@ function updateProfileUI(profile) {
     }
 }
 
-// GAS APIからユーザーデータ取得
+// Vercel APIからユーザーデータ取得
 async function fetchUserData(userId) {
     try {
-        const response = await fetch(`${CONFIG.API_URL}?action=getUserInfo&userId=${userId}`);
+        const response = await fetch(`${CONFIG.API_URL}/get-user-info?userId=${userId}`);
         const data = await response.json();
         
         if (data.success) {
@@ -85,13 +85,12 @@ function updateUsageUI(user) {
                     portalBtn.disabled = true;
                     portalBtn.textContent = '読み込み中...';
                     
-                    const response = await fetch(CONFIG.API_URL, {
+                    const response = await fetch(`${CONFIG.API_URL}/get-portal-url`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
                         },
                         body: JSON.stringify({
-                            action: 'getPortalUrl',
                             userId: profile.userId
                         })
                     });
@@ -141,14 +140,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 upgradeBtn.disabled = true;
                 upgradeBtn.textContent = '処理中...';
                 
-                // GAS APIでStripe Checkoutセッションを作成
-                const response = await fetch(CONFIG.API_URL, {
+                // Vercel APIでStripe Checkoutセッションを作成
+                const response = await fetch(`${CONFIG.API_URL}/stripe-checkout`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        action: 'createCheckout',
                         userId: profile.userId,
                         planType: planType
                     })
