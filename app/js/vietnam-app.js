@@ -69,6 +69,52 @@ function updateUsageUI(user) {
         planLimits.text === -1 ? '/ ∞' : `/ ${planLimits.text}`;
     document.querySelectorAll('.usage-limit')[1].textContent = 
         planLimits.vision === -1 ? '/ ∞' : `/ ${planLimits.vision}`;
+    
+    // Premiumユーザーの場合、解約セクションを表示
+    if (user.plan === 'premium' || user.plan === 'trial') {
+        document.getElementById('cancel-section').style.display = 'block';
+        
+        // カスタマーポータルボタンの処理
+        const portalBtn = document.getElementById('portal-btn');
+        if (portalBtn && !portalBtn.hasAttribute('data-initialized')) {
+            portalBtn.setAttribute('data-initialized', 'true');
+            portalBtn.addEventListener('click', async () => {
+                try {
+                    const profile = await liff.getProfile();
+                    
+                    portalBtn.disabled = true;
+                    portalBtn.textContent = '読み込み中...';
+                    
+                    const response = await fetch(CONFIG.GAS_API_URL, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            action: 'getPortalUrl',
+                            userId: profile.userId
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success && data.url) {
+                        // Stripeカスタマーポータルへ遷移
+                        window.location.href = data.url;
+                    } else {
+                        alert('管理ページの取得に失敗しました: ' + (data.message || '不明なエラー'));
+                        portalBtn.disabled = false;
+                        portalBtn.textContent = 'アカウント管理ページへ';
+                    }
+                } catch (error) {
+                    console.error('ポータルエラー:', error);
+                    alert('エラーが発生しました: ' + error.message);
+                    portalBtn.disabled = false;
+                    portalBtn.textContent = 'アカウント管理ページへ';
+                }
+            });
+        }
+    }
 }
 
 // プレミアムアップグレードボタン
@@ -78,28 +124,55 @@ document.addEventListener('DOMContentLoaded', () => {
     if (upgradeBtn) {
         upgradeBtn.addEventListener('click', async () => {
             try {
+                await liff.init({ liffId: CONFIG.LIFF_ID });
+                
+                if (!liff.isLoggedIn()) {
+                    liff.login();
+                    return;
+                }
+                
                 const profile = await liff.getProfile();
-                const response = await fetch(
-                    `${CONFIG.GAS_API_URL}?action=getUpgradeLink&userId=${profile.userId}`
-                );
+                
+                // 選択されたプランを取得
+                const selectedPlan = document.querySelector('input[name="plan"]:checked').value;
+                const planType = selectedPlan === '3month' ? '3months' : '1month';
+                
+                // ボタンを無効化
+                upgradeBtn.disabled = true;
+                upgradeBtn.textContent = '処理中...';
+                
+                // GAS APIでStripe Checkoutセッションを作成
+                const response = await fetch(CONFIG.GAS_API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        action: 'createCheckout',
+                        userId: profile.userId,
+                        planType: planType
+                    })
+                });
+                
                 const data = await response.json();
                 
-                if (data.success && data.upgradeLink) {
+                if (data.success && data.url) {
                     // Stripe決済ページへ遷移
-                    liff.openWindow({
-                        url: data.upgradeLink,
-                        external: true
-                    });
+                    window.location.href = data.url;
                 } else {
-                    alert('決済リンクの取得に失敗しました');
+                    alert('決済リンクの取得に失敗しました: ' + (data.message || '不明なエラー'));
+                    upgradeBtn.disabled = false;
+                    upgradeBtn.textContent = 'Premium にアップグレード';
                 }
             } catch (error) {
                 console.error('アップグレードエラー:', error);
-                alert('エラーが発生しました');
+                alert('エラーが発生しました: ' + error.message);
+                upgradeBtn.disabled = false;
+                upgradeBtn.textContent = 'Premium にアップグレード';
             }
         });
     }
+    
+    // LIFF初期化
+    initializeLIFF();
 });
-
-// LIFF起動
-initializeLIFF();
