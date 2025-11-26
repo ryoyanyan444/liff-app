@@ -1,7 +1,7 @@
 // ⚠️ 後で自分の値に書き換える！
 const CONFIG = {
     LIFF_ID: '2008551240-vWN36gzR',  // ← 後でLINE Developersから取得したLIFF IDに書き換える
-    GAS_API_URL: 'https://script.google.com/macros/s/AKfycbwDM80XlwPf9A2oj1OnqEK7vKwy2ry-3rfIAUrV1Ri3WyEasa1pbnaUcBCk7UCVQQ-Y/exec'  // ← 自分のGAS APIのURLに書き換える（例: https://script.google.com/macros/s/XXXXX/exec）
+    GAS_API_URL: 'https://script.google.com/macros/s/AKfycbz2Wmya8_CMhayU16QK-qD7PUBH1FoYnicVmOg_0mXO-QlIi8bG-G0ZtH4ov55TIB80/exec'  // ← 自分のGAS APIのURLに書き換える（例: https://script.google.com/macros/s/XXXXX/exec）
 };
 
 // LIFF初期化

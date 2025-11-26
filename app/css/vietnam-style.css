@@ -390,3 +390,52 @@ body {
     color: #999;
     font-size: 12px;
 }
+
+/* 解約・管理セクション */
+.cancel-section {
+    background: #fff3cd;
+    border: 2px solid #ffc107;
+    border-radius: 12px;
+    padding: 20px;
+    margin-top: 0;
+}
+
+.cancel-section h3 {
+    color: #856404;
+    margin-bottom: 10px;
+}
+
+.cancel-section p {
+    color: #856404;
+    margin-bottom: 15px;
+    font-size: 14px;
+}
+
+.portal-btn {
+    width: 100%;
+    padding: 16px;
+    background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.portal-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(23, 162, 184, 0.4);
+}
+
+.portal-btn:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+.portal-btn:active {
+    transform: translateY(0);
+}
