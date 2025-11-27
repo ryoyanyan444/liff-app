@@ -9,10 +9,10 @@
     "deploy": "vercel --prod"
   },
   "dependencies": {
-    "@line/bot-sdk": "^8.0.0",
-    "openai": "^4.20.0",
-    "stripe": "^13.10.0",
-    "@supabase/supabase-js": "^2.38.0"
+    "@line/bot-sdk": "^9.0.0",
+    "@supabase/supabase-js": "^2.39.0",
+    "openai": "^4.28.0",
+    "stripe": "^14.0.0"
   },
   "engines": {
     "node": ">=18.0.0"
