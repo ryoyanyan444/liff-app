@@ -76,13 +76,5 @@
         }
       ]
     }
-  ],
-  "functions": {
-    "api/webhook.js": {
-      "maxDuration": 10
-    },
-    "api/stripe-webhook.js": {
-      "maxDuration": 10
-    }
-  }
+  ]
 }
