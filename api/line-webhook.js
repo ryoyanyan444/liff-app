@@ -8,7 +8,10 @@ const config = {
   channelSecret: process.env.LINE_CHANNEL_SECRET
 };
 
-const client = new line.Client(config);
+// ⭐ 新しいSDKの使い方に統一
+const client = new line.messagingApi.MessagingApiClient({
+  channelAccessToken: config.channelAccessToken
+});
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
@@ -43,26 +46,35 @@ module.exports = async (req, res) => {
   }
 
   try {
-    // LINE署名検証（@line/bot-sdkが自動で行う）
+    // LINE署名検証
     const signature = req.headers['x-line-signature'];
     if (!signature) {
       console.error('No x-line-signature header');
       return res.status(400).json({ error: 'Missing signature' });
     }
 
+    // ⭐ 署名検証を追加
+    const body = JSON.stringify(req.body);
+    const isValid = line.validateSignature(body, config.channelSecret, signature);
+    
+    if (!isValid) {
+      console.error('Invalid signature');
+      return res.status(401).json({ error: 'Invalid signature' });
+    }
+
     // リクエストボディの取得
-    const body = req.body;
+    const events = req.body.events;
     
     // 空のevents配列の場合（LINEプラットフォームからの疎通確認）
-    if (!body.events || body.events.length === 0) {
+    if (!events || events.length === 0) {
       console.log('疎通確認リクエスト受信');
       return res.status(200).json({ message: 'OK' });
     }
 
-    console.log('Webhook events received:', body.events.length);
+    console.log('Webhook events received:', events.length);
 
     // 各イベントを処理（非同期処理）
-    const promises = body.events.map(event => handleEvent(event));
+    const promises = events.map(event => handleEvent(event));
     await Promise.all(promises);
 
     return res.status(200).json({ message: 'Success' });
@@ -94,7 +106,7 @@ async function handleEvent(event) {
   const replyToken = event.replyToken;
 
   try {
-    // ユーザープロフィール取得
+    // ⭐ getProfile も新しいSDKに対応
     const profile = await client.getProfile(userId);
     console.log('User profile:', profile.displayName);
 
@@ -107,16 +119,16 @@ async function handleEvent(event) {
 
     if (userError || !user) {
       console.log('Creating new user');
-      // 新規ユーザー作成
       const { data: newUser } = await supabase
         .from('users')
         .insert([{
           user_id: userId,
           display_name: profile.displayName,
           plan: 'free',
-          message_count: 0,
+          today_count: 0,  // ⭐ message_count から today_count に統一
+          vision_count: 0,
           daily_limit: 5,
-          last_reset: new Date().toISOString()
+          last_reset_date: new Date().toISOString().split('T')[0]  // ⭐ 日付のみ保存
         }])
         .select()
         .single();
@@ -124,36 +136,40 @@ async function handleEvent(event) {
       user = newUser;
     }
 
-    // 日次リセット確認
-    const lastReset = new Date(user.last_reset);
-    const now = new Date();
-    const tokyoTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Tokyo' }));
+    // ⭐ 日次リセット確認（簡略化）
+    const today = new Date().toISOString().split('T')[0];
     
-    if (tokyoTime.getDate() !== lastReset.getDate()) {
+    if (user.last_reset_date !== today) {
       console.log('Daily reset triggered');
       await supabase
         .from('users')
         .update({
-          message_count: 0,
-          last_reset: tokyoTime.toISOString()
+          today_count: 0,
+          vision_count: 0,
+          last_reset_date: today
         })
         .eq('user_id', userId);
       
-      user.message_count = 0;
+      user.today_count = 0;
+      user.vision_count = 0;
     }
 
     // 利用制限チェック
     const limits = {
-      free: 5,
+      free: 10,      // ⭐ 他のファイルと統一
       trial: 50,
       premium: 999999
     };
 
-    if (user.message_count >= limits[user.plan]) {
+    if (user.today_count >= limits[user.plan]) {
       console.log('Usage limit reached');
-      return client.replyMessage(replyToken, {
-        type: 'text',
-        text: `本日の利用上限に達しました。\n\n現在のプラン: ${user.plan}\n本日の利用回数: ${user.message_count}/${limits[user.plan]}\n\nプレミアムプランにアップグレードすると無制限でご利用いただけます！`
+      // ⭐ 新しいSDKの返信方法
+      return client.replyMessage({
+        replyToken: replyToken,
+        messages: [{
+          type: 'text',
+          text: `本日の利用上限に達しました。\n\n現在のプラン: ${user.plan}\n本日の利用回数: ${user.today_count}/${limits[user.plan]}\n\nプレミアムプランにアップグレードすると無制限でご利用いただけます！`
+        }]
       });
     }
 
@@ -182,15 +198,18 @@ async function handleEvent(event) {
     await supabase
       .from('users')
       .update({
-        message_count: user.message_count + 1
+        today_count: user.today_count + 1  // ⭐ カラム名を統一
       })
       .eq('user_id', userId);
 
     console.log('Sending reply to LINE');
-    // LINE返信
-    return client.replyMessage(replyToken, {
-      type: 'text',
-      text: aiResponse
+    // ⭐ LINE返信（新しいSDK）
+    return client.replyMessage({
+      replyToken: replyToken,
+      messages: [{
+        type: 'text',
+        text: aiResponse
+      }]
     });
 
   } catch (error) {
@@ -198,9 +217,12 @@ async function handleEvent(event) {
     
     // エラーメッセージを返信
     try {
-      return client.replyMessage(replyToken, {
-        type: 'text',
-        text: 'エラーが発生しました。しばらくしてからもう一度お試しください。'
+      return client.replyMessage({
+        replyToken: replyToken,
+        messages: [{
+          type: 'text',
+          text: 'エラーが発生しました。しばらくしてからもう一度お試しください。'
+        }]
       });
     } catch (replyError) {
       console.error('Failed to send error message:', replyError);
