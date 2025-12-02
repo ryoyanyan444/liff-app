@@ -1,105 +1,92 @@
 const axios = require('axios');
 const fs = require('fs');
 
-// ========== 🔧 設定（ここだけ変更） ==========
+// ========== 🔧 設定 ==========
 const CONFIG = {
   channelAccessToken: 'QaI7weNXO+oZg5b+IQRCw9RbhaQ7sNW4/KNLzkbe8n/0kNoRL/XRswxiIMGhbqHR+HccG6Y5p2nRdPkbDaRtnsmf1U/id7UEnwwfABpFyZuGzpVB0d1WLIiBwousRunQ0SGjF7PyC4GNDOg5XyQAuAdB04t89/1O/w1cDnyilFU=',
-  botId: '@687hoviz',  // ⚠️ あなたの実際のBOT IDに変更してください
+  botId: '@687hoviz',
   imagePath: './richmenu.png'
 };
 
-// ========== 📱 Rich Menu定義 ==========
+// ========== 📱 Rich Menu定義 (修正版) ==========
 const richMenuData = {
   size: {
     width: 2500,
     height: 1686
   },
   selected: true,
-  name: 'AI Chat Menu',
+  name: 'Miu Bot Menu',
   chatBarText: 'メニュー',
   areas: [
-    // 上部バー: LIFF
+    // 1. 宿題・レポート (上部バー)
     {
       bounds: { x: 0, y: 0, width: 2500, height: 283 },
       action: {
+        type: 'message',
+        text: '/menu homework_report'
+      }
+    },
+    // 2. Miuと話す (左側大きいエリア)
+    {
+      bounds: { x: 0, y: 283, width: 855, height: 1176 },
+      action: {
+        type: 'message',
+        text: '/mode miu-chat'
+      }
+    },
+    // 3. テンプレ (中央上)
+    {
+      bounds: { x: 855, y: 283, width: 811, height: 579 },
+      action: {
         type: 'uri',
         uri: 'https://liff.line.me/2008551240-W6log3Gr'
       }
     },
-    // 左上: 通常モード
-    {
-      bounds: { x: 0, y: 284, width: 833, height: 579 },
-      action: {
-        type: 'postback',
-        data: 'action=switch_mode&mode=normal',
-        displayText: '✅ 通常モードに切り替え完了'
-      }
-    },
-    // 中央上: リサーチモード
-    {
-      bounds: { x: 833, y: 284, width: 833, height: 579 },
-      action: {
-        type: 'postback',
-        data: 'action=switch_mode&mode=deep_research',
-        displayText: '✅ ディープリサーチモードに切り替え完了'
-      }
-    },
-    // 右上: 高性能AI
+    // 4. 返信モード (右上)
     {
       bounds: { x: 1666, y: 284, width: 833, height: 579 },
       action: {
-        type: 'postback',
-        data: 'action=switch_mode&mode=high_performance',
-        displayText: '✅ 高性能AIモードに切り替え完了'
+        type: 'message',
+        text: '/mode reply'
       }
     },
-    // 左下: 返信作成
+    // 5. 翻訳モード (中央下)
     {
-      bounds: { x: 0, y: 865, width: 833, height: 579 },
+      bounds: { x: 855, y: 862, width: 811, height: 597 },
       action: {
-        type: 'postback',
-        data: 'action=reply_mode',
-        displayText: '💬 返信文作成モード'
+        type: 'message',
+        text: '/mode translate'
       }
     },
-    // 中央下: テンプレート
+    // 6. 画像生成 (右下)
     {
-      bounds: { x: 833, y: 865, width: 833, height: 579 },
+      bounds: { x: 1666, y: 863, width: 833, height: 597 },
       action: {
-        type: 'uri',
-        uri: 'https://liff.line.me/2008551240-W6log3Gr'
+        type: 'message',
+        text: '/mode image'
       }
     },
-    // 右下: 料金
+    // 7. メッセージ欄展開 (最下部左) ✅ 修正
     {
-      bounds: { x: 1666, y: 865, width: 833, height: 579 },
-      action: {
-        type: 'postback',
-        data: 'action=show_pricing',
-        displayText: '💰 料金プラン'
-      }
-    },
-    // 最下部左: キーボード展開
-    {
-      bounds: { x: 0, y: 1460, width: 1389, height: 226 },
+      bounds: { x: 0, y: 1460, width: 1665, height: 226 },
       action: {
         type: 'postback',
         data: 'action=open_keyboard',
         inputOption: 'openKeyboard'
       }
     },
-    // 最下部中央: ボイス展開
+    // 8. 音声入力オン (最下部中央) ✅ 修正
     {
-      bounds: { x: 1390, y: 1460, width: 354, height: 226 },
+      bounds: { x: 1666, y: 1461, width: 256, height: 226 },
       action: {
         type: 'postback',
         data: 'action=open_voice',
         inputOption: 'openVoice'
       }
     },
-    // 最下部右: シェア
+    // 9. シェアリンク展開 (最下部右)
     {
-      bounds: { x: 1744, y: 1460, width: 756, height: 226 },
+      bounds: { x: 1922, y: 1461, width: 578, height: 226 },
       action: {
         type: 'uri',
         uri: `https://line.me/R/nv/recommendOA/${CONFIG.botId}`
@@ -110,7 +97,7 @@ const richMenuData = {
 
 // ========== 🚀 メイン処理 ==========
 async function setupRichMenu() {
-  console.log('🚀 Rich Menu Setup Start\n');
+  console.log('🚀 Miu Bot Rich Menu Setup Start\n');
   
   const headers = {
     'Authorization': `Bearer ${CONFIG.channelAccessToken}`,
@@ -118,7 +105,20 @@ async function setupRichMenu() {
   };
   
   try {
-    console.log('📱 Creating Rich Menu...');
+    // 既存のデフォルトリッチメニューを削除
+    console.log('🗑️  Removing old default rich menu...');
+    try {
+      await axios.delete(
+        'https://api.line.me/v2/bot/user/all/richmenu',
+        { headers }
+      );
+      console.log('✅ Old menu removed\n');
+    } catch (e) {
+      console.log('ℹ️  No existing default menu\n');
+    }
+
+    // 新しいリッチメニューを作成
+    console.log('📱 Creating new Rich Menu...');
     const response = await axios.post(
       'https://api.line.me/v2/bot/richmenu',
       richMenuData,
@@ -127,6 +127,7 @@ async function setupRichMenu() {
     const richMenuId = response.data.richMenuId;
     console.log(`✅ Created: ${richMenuId}\n`);
     
+    // 画像をアップロード
     console.log('🖼️  Uploading image...');
     const imageBuffer = fs.readFileSync(CONFIG.imagePath);
     await axios.post(
@@ -141,6 +142,7 @@ async function setupRichMenu() {
     );
     console.log('✅ Image uploaded\n');
     
+    // デフォルトとして設定
     console.log('⚙️  Setting as default...');
     await axios.post(
       `https://api.line.me/v2/bot/user/all/richmenu/${richMenuId}`,
@@ -151,6 +153,14 @@ async function setupRichMenu() {
     
     console.log('🎉 COMPLETE! Check your LINE app!');
     console.log(`📋 Rich Menu ID: ${richMenuId}`);
+    console.log('\n📱 メニュー構成:');
+    console.log('  - 宿題・レポート (上部)');
+    console.log('  - Miuと話す (左側)');
+    console.log('  - テンプレ (中央上)');
+    console.log('  - 返信モード (右上)');
+    console.log('  - 翻訳モード (中央下)');
+    console.log('  - 画像生成 (右下)');
+    console.log('  - キーボード/音声/シェア (最下部)');
     
   } catch (error) {
     console.error('\n❌ Error occurred:');

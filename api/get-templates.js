@@ -1,70 +1,99 @@
-const { createClient } = require('@supabase/supabase-js');
+// api/get-templates.js
 
+import { createClient } from '@supabase/supabase-js';
+
+// Supabaseクライアント
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_KEY
 );
 
-module.exports = async (req, res) => {
-  // CORS設定
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
+// デフォルトのテンプレ（Supabaseが空 or エラーのときに使う）
+const FALLBACK_TEMPLATES = [
+  {
+    id: 1,
+    category: "reply_polite",
+    displayLabel: "返信モード：丁寧なお礼",
+    message: "お問い合わせありがとうございます。こちらこそよろしくお願いいたします。"
+  },
+  {
+    id: 2,
+    category: "reply_casual",
+    displayLabel: "返信モード：カジュアルな返事",
+    message: "メッセージありがとう！めっちゃ助かりました！"
+  }
+];
 
-  // OPTIONSリクエスト対応
+export default async function handler(req, res) {
+  // CORS（最低限）
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'Content-Type, X-Requested-With'
+  );
+
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
 
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return res.status(405).json({
+      success: false,
+      error: 'Method not allowed',
+      debug: 'supabase-with-fallback'
+    });
   }
 
   try {
-    // テンプレート一覧取得
-    const { data: templates, error } = await supabase
+    // まず Supabase から全件とりあえず取ってみる
+    const { data, error } = await supabase
       .from('templates')
-      .select('*')
-      .eq('is_active', true)
-      .order('created_at', { ascending: true });
+      .select('*');
 
-    if (error) throw error;
-
-    // テンプレートが存在しない場合はデフォルトを返す
-    if (!templates || templates.length === 0) {
-      return res.status(200).json([
-        {
-          id: 1,
-          title: 'Dịch tiếng Việt',
-          description: 'Dịch văn bản sang tiếng Việt',
-          prompt: 'Hãy dịch văn bản sau sang tiếng Việt:'
-        },
-        {
-          id: 2,
-          title: 'Dịch tiếng Anh',
-          description: 'Dịch văn bản sang tiếng Anh',
-          prompt: 'Hãy dịch văn bản sau sang tiếng Anh:'
-        },
-        {
-          id: 3,
-          title: 'Giải thích đơn giản',
-          description: 'Giải thích nội dung một cách dễ hiểu',
-          prompt: 'Hãy giải thích nội dung sau một cách đơn giản và dễ hiểu:'
-        },
-        {
-          id: 4,
-          title: 'Tóm tắt nội dung',
-          description: 'Tóm tắt văn bản ngắn gọn',
-          prompt: 'Hãy tóm tắt nội dung sau một cách ngắn gọn:'
-        }
-      ]);
+    // エラー or 行が0件 → デフォルトテンプレを返す
+    if (error) {
+      console.error('Supabase error in get-templates:', error);
+      return res.status(200).json({
+        success: true,
+        debug: 'fallback-used-error',
+        source: 'fallback',
+        templates: FALLBACK_TEMPLATES
+      });
     }
 
-    return res.status(200).json(templates);
+    if (!data || data.length === 0) {
+      // テーブル空っぽの場合もデフォルト
+      return res.status(200).json({
+        success: true,
+        debug: 'fallback-used-empty',
+        source: 'fallback',
+        templates: FALLBACK_TEMPLATES
+      });
+    }
 
-  } catch (error) {
-    console.error('Get templates error:', error);
-    return res.status(500).json({ error: error.message });
+    // Supabase に行がある場合はこちら
+    const templates = data.map((t) => ({
+      id: t.id,
+      category: t.category ?? null,
+      displayLabel: t.display_label ?? null,
+      message: t.message ?? null
+    }));
+
+    return res.status(200).json({
+      success: true,
+      debug: 'supabase-data',
+      source: 'supabase',
+      templates
+    });
+  } catch (e) {
+    console.error('Get templates fatal error:', e);
+    // ここでも最悪フォールバック
+    return res.status(200).json({
+      success: true,
+      debug: 'fallback-used-exception',
+      source: 'fallback',
+      templates: FALLBACK_TEMPLATES
+    });
   }
-};
+}

@@ -1,170 +1,407 @@
+/* ========================================
+   基本設定
+======================================== */
 * {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Sans', sans-serif;
-  background: #f5f5f5;
-  overflow-x: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', Arial, sans-serif;
+    background-color: #f5f5f5;
+    color: #333;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
 }
 
-/* タブナビゲーション */
-.tab-nav {
-  position: sticky;
-  top: 0;
-  background: white;
-  border-bottom: 1px solid #e0e0e0;
-  overflow-x: auto;
-  white-space: nowrap;
-  z-index: 100;
-  -webkit-overflow-scrolling: touch;
+#app {
+    max-width: 100%;
+    margin: 0 auto;
+    background-color: #fff;
+    min-height: 100vh;
 }
 
-.tab-nav::-webkit-scrollbar {
-  display: none;
-}
-
-.tab-list {
-  display: inline-flex;
-  padding: 12px 8px;
-  gap: 8px;
-}
-
-.tab-item {
-  padding: 8px 16px;
-  border-radius: 20px;
-  background: #f0f0f0;
-  color: #666;
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.2s;
-  border: none;
-  white-space: nowrap;
-  font-weight: 500;
-}
-
-.tab-item.active {
-  background: #06c755;
-  color: white;
-  font-weight: bold;
-}
-
-.tab-item:active {
-  transform: scale(0.95);
-}
-
-/* テンプレートリスト */
-.template-list {
-  padding: 16px;
-  padding-bottom: 40px;
-}
-
-.template-card {
-  background: white;
-  border-radius: 12px;
-  padding: 16px;
-  margin-bottom: 12px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.08);
-  cursor: pointer;
-  transition: all 0.2s;
-  border: 1px solid #f0f0f0;
-}
-
-.template-card:hover {
-  box-shadow: 0 4px 8px rgba(0,0,0,0.12);
-}
-
-.template-card:active {
-  transform: scale(0.98);
-  background: #f9f9f9;
-}
-
-.template-label {
-  font-size: 16px;
-  font-weight: bold;
-  color: #333;
-  margin-bottom: 8px;
-}
-
-.template-message {
-  font-size: 14px;
-  color: #666;
-  line-height: 1.6;
-}
-
-/* カテゴリタイトル */
-.category-title {
-  font-size: 18px;
-  font-weight: bold;
-  color: #333;
-  margin: 24px 0 12px 0;
-  padding-left: 12px;
-  border-left: 4px solid #06c755;
-}
-
-.category-title:first-child {
-  margin-top: 8px;
-}
-
-/* ローディング */
+/* ========================================
+   ローディング画面
+======================================== */
 .loading {
-  text-align: center;
-  padding: 60px 20px;
-  color: #999;
-  font-size: 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    background-color: #fff;
 }
 
-.loading::before {
-  content: "⏳";
-  display: block;
-  font-size: 40px;
-  margin-bottom: 16px;
+.loading-spinner {
+    width: 50px;
+    height: 50px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #FFD700;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
 }
 
-/* エラー */
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.loading p {
+    margin-top: 20px;
+    font-size: 16px;
+    color: #666;
+}
+
+/* ========================================
+   エラー画面
+======================================== */
 .error {
-  text-align: center;
-  padding: 60px 20px;
-  color: #f44336;
-  font-size: 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 20px;
+    text-align: center;
 }
 
-.error::before {
-  content: "⚠️";
-  display: block;
-  font-size: 40px;
-  margin-bottom: 16px;
+.error p {
+    margin: 10px 0;
+    font-size: 16px;
 }
 
-/* 空 */
-.empty {
-  text-align: center;
-  padding: 60px 20px;
-  color: #999;
-  font-size: 14px;
+.error button {
+    margin-top: 20px;
+    padding: 12px 24px;
+    background-color: #06C755;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    cursor: pointer;
 }
 
-.empty::before {
-  content: "📭";
-  display: block;
-  font-size: 40px;
-  margin-bottom: 16px;
+/* ========================================
+   タブナビゲーション
+======================================== */
+.tab-navigation {
+    position: sticky;
+    top: 0;
+    background-color: #fff;
+    border-bottom: 1px solid #e0e0e0;
+    z-index: 100;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
-/* レスポンシブ */
-@media (max-width: 360px) {
-  .tab-item {
+.tab-scroll {
+    display: flex;
+    min-width: max-content;
+    padding: 0 8px;
+}
+
+.tab-button {
+    flex-shrink: 0;
+    padding: 12px 16px;
+    background: none;
+    border: none;
+    border-bottom: 3px solid transparent;
+    font-size: 14px;
+    color: #666;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.3s;
+}
+
+.tab-button.active {
+    color: #FFD700;
+    border-bottom-color: #FFD700;
+    font-weight: bold;
+}
+
+.tab-button:hover {
+    background-color: #f9f9f9;
+}
+
+/* ========================================
+   タブコンテンツ
+======================================== */
+.tab-content {
+    padding-bottom: 20px;
+}
+
+.tab-pane {
+    display: none;
+    animation: fadeIn 0.3s ease-in;
+}
+
+.tab-pane.active {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* ========================================
+   Miuのメッセージ
+======================================== */
+.miu-greeting {
+    background: linear-gradient(135deg, #FFF9E6 0%, #FFFACD 100%);
+    padding: 20px;
+    text-align: center;
+    border-bottom: 2px solid #FFD700;
+}
+
+.miu-greeting p {
+    margin: 5px 0;
+    font-size: 16px;
+    color: #333;
+}
+
+.miu-footer {
+    padding: 20px;
+    text-align: center;
+    background-color: #f9f9f9;
+    margin-top: 20px;
+}
+
+.miu-footer p {
+    font-size: 14px;
+    color: #666;
+}
+
+/* ========================================
+   ホームタブ
+======================================== */
+.home-categories {
+    padding: 0;
+}
+
+.home-category-section {
+    margin-bottom: 0;
+    border-bottom: 8px solid #f5f5f5;
+}
+
+.home-category-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    background-color: #fafafa;
+}
+
+.home-category-title {
+    font-size: 16px;
+    font-weight: bold;
+    color: #333;
+}
+
+.more-link {
+    font-size: 14px;
+    color: #06C755;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.more-link:hover {
+    text-decoration: underline;
+}
+
+.home-category-cards {
+    display: flex;
+    gap: 12px;
+    padding: 16px 20px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.home-card {
+    flex-shrink: 0;
+    width: 120px;
+    padding: 16px;
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 12px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.home-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    border-color: #FFD700;
+}
+
+.home-card-icon {
+    font-size: 32px;
+    margin-bottom: 8px;
+}
+
+.home-card-label {
     font-size: 13px;
-    padding: 6px 12px;
-  }
-  
-  .template-label {
+    color: #333;
+    line-height: 1.4;
+}
+
+/* ========================================
+   詳細カテゴリタブ
+======================================== */
+.detail-categories {
+    padding: 0;
+}
+
+.middle-category {
+    margin-bottom: 0;
+    border-bottom: 8px solid #f5f5f5;
+}
+
+.middle-category-header {
+    padding: 16px 20px;
+    background-color: #fafafa;
+    font-size: 16px;
+    font-weight: bold;
+    color: #333;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.small-items {
+    background-color: white;
+}
+
+.small-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    border-bottom: 1px solid #f0f0f0;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.small-item:last-child {
+    border-bottom: none;
+}
+
+.small-item:hover {
+    background-color: #f9f9f9;
+}
+
+.small-item:active {
+    background-color: #f0f0f0;
+}
+
+.small-item-label {
     font-size: 15px;
-  }
-  
-  .template-message {
+    color: #333;
+}
+
+.small-item-arrow {
+    font-size: 18px;
+    color: #999;
+}
+
+/* ========================================
+   質問の履歴タブ
+======================================== */
+.history-list {
+    padding: 16px;
+}
+
+.history-item {
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 12px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.history-item:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    border-color: #FFD700;
+}
+
+.history-item-title {
+    font-size: 16px;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 8px;
+}
+
+.history-item-path {
     font-size: 13px;
-  }
+    color: #666;
+    margin-bottom: 8px;
+}
+
+.history-item-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.history-item-date {
+    font-size: 12px;
+    color: #999;
+}
+
+.history-item-button {
+    padding: 6px 12px;
+    background-color: #06C755;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.history-empty {
+    text-align: center;
+    padding: 60px 20px;
+    color: #999;
+}
+
+.history-empty p {
+    margin: 10px 0;
+    font-size: 15px;
+}
+
+/* ========================================
+   レスポンシブ対応
+======================================== */
+@media (max-width: 360px) {
+    .home-card {
+        width: 100px;
+        padding: 12px;
+    }
+    
+    .home-card-icon {
+        font-size: 28px;
+    }
+    
+    .home-card-label {
+        font-size: 12px;
+    }
+}
+
+/* ========================================
+   スクロールバー非表示（iOS Safari対応）
+======================================== */
+.tab-navigation::-webkit-scrollbar,
+.home-category-cards::-webkit-scrollbar {
+    display: none;
+}
+
+.tab-navigation,
+.home-category-cards {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
 }

@@ -19,50 +19,53 @@ module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
+  );
 
-  // OPTIONSリクエスト対応
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
 
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return res.status(405).json({ success: false, error: 'Method not allowed' });
   }
 
   try {
     const { userId, templateId } = req.body;
 
     if (!userId || !templateId) {
-      return res.status(400).json({ error: 'Missing userId or templateId' });
+      return res.status(400).json({ success: false, error: 'Missing userId or templateId' });
     }
 
-    // テンプレート取得
+    // ⭐ テンプレート取得（カラム名はテーブル定義に合わせる）
     const { data: template, error } = await supabase
       .from('templates')
-      .select('*')
+      .select('id, display_label, message')
       .eq('id', templateId)
       .single();
 
     if (error || !template) {
-      return res.status(404).json({ error: 'Template not found' });
+      console.error('Template fetch error:', error);
+      return res.status(404).json({ success: false, error: 'Template not found' });
     }
 
-    // LINEにテンプレートメッセージを送信
+    // ⭐ LINEにテンプレートメッセージ送信
     await client.pushMessage({
       to: userId,
       messages: [
         {
           type: 'text',
-          text: `📋 ${template.title}\n\n${template.prompt}\n\n続けて内容を送信してください。`
+          text: `📋 ${template.display_label}\n\n${template.message}\n\n続けて内容を送信してください。`
         }
       ]
     });
 
-    return res.status(200).json({ success: true, message: 'Template sent' });
+    return res.status(200).json({ success: true });
 
-  } catch (error) {
-    console.error('Send template error:', error);
-    return res.status(500).json({ error: error.message });
+  } catch (err) {
+    console.error('Send template error:', err);
+    return res.status(500).json({ success: false, error: err.message });
   }
 };
