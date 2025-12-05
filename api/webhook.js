@@ -110,6 +110,13 @@ const IMAGE_SIZES = {
 // ===============================
 // 🌐 Webhook エンドポイント
 // ===============================
+// ===============================
+// 🌐 Webhook エンドポイント
+// ===============================
+
+// ✅ Webhook処理済みイベントを記録
+const processedEvents = new Set();
+
 module.exports = async (req, res) => {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -119,8 +126,27 @@ module.exports = async (req, res) => {
     const events = req.body.events;
     console.log('📦 Webhook received:', events);
 
+    // ✅ 重複イベントをフィルタリング
+    const uniqueEvents = events.filter(event => {
+      const eventId = event.webhookEventId;
+      
+      if (processedEvents.has(eventId)) {
+        console.log('⚠️ Duplicate event detected, skipping:', eventId);
+        return false;
+      }
+      
+      processedEvents.add(eventId);
+      
+      // 1時間後に削除（メモリリーク防止）
+      setTimeout(() => processedEvents.delete(eventId), 60 * 60 * 1000);
+      
+      return true;
+    });
+
+    console.log(`📊 Processing ${uniqueEvents.length} unique events (filtered ${events.length - uniqueEvents.length} duplicates)`);
+
     await Promise.all(
-      events.map((event) => handleEvent(event).catch((err) => {
+      uniqueEvents.map((event) => handleEvent(event).catch((err) => {
         console.error('❌ Event processing error:', err);
         return null;
       }))
@@ -132,6 +158,7 @@ module.exports = async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 };
+
 
 // ===============================
 // handleEvent 内に追加
@@ -152,7 +179,7 @@ async function handleEvent(event) {
   const messageType = event.message.type;
   const userId = event.source.userId;
   const replyToken = event.replyToken;
-  const userMessage = messageType === 'text' ? (event.message.text || '') : '';
+  let userMessage = messageType === 'text' ? (event.message.text || '') : '';
 
   try {
     const profile = await client.getProfile(userId);
@@ -160,6 +187,8 @@ async function handleEvent(event) {
 
     let user = await getOrCreateUser(userId, profile.displayName);
     user = await handleDailyReset(user, userId);
+
+    await updateRichMenuByProfile(userId, user);
 
     const currentMode = user.mode || MODES.MIU_CHAT;
     const plan = user.plan || 'free';
@@ -171,44 +200,381 @@ async function handleEvent(event) {
     };
 
     if (messageType === 'text') {
-      const text = userMessage.trim();
+  let text = userMessage.trim();
 
-      if (text.startsWith('/set_level_')) {
-        return await handleLevelSetting(text, userId, replyToken, user);
-      }
+  // ✅ 1) 「他にも翻訳する」→ 翻訳モードに戻して入力方法クイックリプライ
+  if (text === '他にも翻訳する') {
+    await supabase
+      .from('users')
+      .update({ mode: MODES.TRANSLATE })
+      .eq('user_id', userId);
 
-      if (!user.japanese_level) {
-        return await promptJapaneseLevel(replyToken);
-      }
+    return client.replyMessage({
+      replyToken,
+      messages: [{
+        type: 'text',
+        text: 'つぎに翻訳したいものをえらんでね💚',
+        quickReply: {
+          items: [
+            {
+              type: 'action',
+              action: {
+                type: 'message',
+                label: 'テキストから',
+                text: 'テキストで翻訳を送る',
+              },
+            },
+            {
+              type: 'action',
+              action: {
+                type: 'camera',
+                label: 'カメラから',
+              },
+            },
+            {
+              type: 'action',
+              action: {
+                type: 'cameraRoll',
+                label: 'アルバムから',
+              },
+            },
+          ],
+        },
+      }],
+    });
+  }
 
-      if (todayCount >= (limits[plan] || limits.free)) {
-        return await sendUsageLimitMessage(replyToken, plan, todayCount, limits);
-      }
+  // ✅ 2) 「もっと詳しくMiuにきく」→ 履歴を参照して内容に応じた深掘り
+if (text === 'もっと詳しくMiuにきく') {
+  console.log('🔵 [DEBUG] "もっと詳しくMiuにきく" 処理開始');
+  
+  const history = user.conversation_history || [];
+  const lastAssistantMsg = [...history].reverse().find(msg => msg.role === 'assistant');
 
-      if (text.startsWith('/mode ')) {
-        return await handleModeCommand(text, userId, replyToken, user);
-      }
+  if (!lastAssistantMsg) {
+    console.log('❌ 直近のアシスタント応答が見つからない');
+    return client.replyMessage({
+      replyToken,
+      messages: [{
+        type: 'text',
+        text: '直近の翻訳が見つかりませんでした💦\n\nもう一度翻訳したい内容を送ってください😊'
+      }]
+    });
+  }
 
-      if (text.startsWith('/reply_style ')) {
-        return await handleReplyStyleCommand(text, userId, replyToken, user);
-      }
+  // ✅ 一時保存された画像を取得
+  const tempImage = user.temp_image_base64;
+  const tempImageTime = user.temp_image_timestamp;
 
-      // ✅ アニメスタイル選択コマンド処理を追加
-      if (text.startsWith('/anime_style ')) {
-        return await handleAnimeStyleCommand(text, userId, replyToken, user);
-      }
+  // ✅ 画像が1時間以内に保存されたものか確認
+  let isImageValid = false;
+  if (tempImage && tempImageTime) {
+    const imageAge = Date.now() - new Date(tempImageTime).getTime();
+    const oneHour = 60 * 60 * 1000;
+    isImageValid = imageAge < oneHour;
+    
+    if (!isImageValid) {
+      console.log('⚠️ Temporary image expired (>1 hour)');
+    }
+  }
 
-       if (text.startsWith('/image_size ')) {
-      return await handleImageSizeCommand(text, userId, replyToken, user);
+  let lastTranslation = null;
+  try {
+    if (lastAssistantMsg.content && lastAssistantMsg.content.startsWith('{')) {
+      lastTranslation = JSON.parse(lastAssistantMsg.content);
+      console.log('✅ JSON解析成功');
+    } else {
+      lastTranslation = { ja: lastAssistantMsg.content || '情報なし' };
+      console.log('ℹ️ プレーンテキストとして処理');
+    }
+  } catch (parseError) {
+    console.error('❌ JSON parse error:', parseError);
+    lastTranslation = { ja: String(lastAssistantMsg.content).substring(0, 500) };
+  }
+
+  try {
+    await showLoadingAnimation(userId);
+    await incrementUsageCount(userId);
+    
+    const systemPrompt = buildSystemPrompt(currentMode, user.japanese_level, user.reply_style);
+    
+    // ✅ 画像がある場合は画像も含める
+    let userContent;
+    if (isImageValid && tempImage) {
+      userContent = [
+        {
+          type: 'text',
+          text: `以下の画像について、もっと詳しく教えてください：
+
+【翻訳した内容】
+${lastTranslation.ja || lastTranslation.vi || '情報を取得できませんでした'}
+
+【あなたの役割】
+画像を見ながら、この内容について、ユーザーが本当に知りたいことを考えて、詳しく説明してください。
+
+【内容に応じて説明すること】
+
+▼ 食品・飲料・お菓子の場合：
+- どんな味か、どんな時に飲む/食べるものか
+- 日本でどれくらい人気か、誰に人気か
+- ベトナムの似た商品と比べてどう違うか
+- おすすめの食べ方・飲み方
+- 賞味期限や保存方法で気をつけること
+- アレルギー成分（あれば）
+- **画像から読み取れる成分表示、容量、メーカー名なども含めて説明**
+
+▼ 書類・契約・請求書の場合：
+- この書類で一番大事なポイント
+- いつまでに何をしないといけないか
+- お金を払う必要があるか、いくらか
+- サインや返送が必要か
+- 気をつけるべきリスクや注意点
+- わからない時に誰に相談すればいいか
+
+▼ マニュアル・説明書の場合：
+- 手順の要約（何をすればいいか）
+- よく間違えやすいポイント
+- 安全に気をつけること
+- トラブルが起きた時の対処法
+
+▼ ポスター・看板・広告の場合：
+- 何の宣伝・お知らせか
+- 期限や条件があるか
+- お得な情報や注意点
+- 参加方法や問い合わせ先
+
+▼ その他の場合：
+- ユーザーが知りたいであろう追加情報
+- 文化的な背景や日本の習慣
+- 関連する豆知識
+
+【重要】
+- やさしい日本語とベトナム語の両方で説明してください
+- 必ずJSON形式で返してください: {"ja": "...", "vi": "..."}
+- 画像から読み取れる具体的な情報を最大限活用してください`
+        },
+        {
+          type: 'image_url',
+          image_url: {
+            url: `data:image/jpeg;base64,${tempImage}`
+          }
+        }
+      ];
+      
+      console.log('📸 画像を含めてOpenAIに送信');
+    } else {
+      // 画像がない場合は従来通りテキストのみ
+      userContent = `以下の内容について、もっと詳しく教えてください：
+
+【翻訳した内容】
+${lastTranslation.ja || lastTranslation.vi || '情報を取得できませんでした'}
+
+【あなたの役割】
+この内容について、ユーザーが本当に知りたいことを考えて、詳しく説明してください。
+
+（以下、既存のプロンプトと同じ）`;
+      
+      console.log('📝 テキストのみでOpenAIに送信（画像なし）');
+    }
+    
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userContent }
+      ],
+      temperature: 0.7,
+    });
+
+    const responseText = completion.choices[0].message.content;
+    console.log('🤖 OpenAI Response:', responseText.substring(0, 200));
+
+    // ✅ 画像を使用したら削除
+    if (isImageValid && tempImage) {
+      await supabase
+        .from('users')
+        .update({ 
+          temp_image_base64: null,
+          temp_image_timestamp: null
+        })
+        .eq('user_id', userId);
+      
+      console.log('🗑️ Temporary image deleted after use');
     }
 
-      await showLoadingAnimation(userId);
-      await incrementUsageCount(userId);
+    // ✅ Markdownコードブロックを除去してからJSONを抽出
+    let cleanedText = responseText;
+    cleanedText = cleanedText.replace(/```json\s*/g, '');
+    cleanedText = cleanedText.replace(/```\s*/g, '');
+    
+    const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
 
-      return await callOpenAI(userMessage, currentMode, user, replyToken, userId);
+    let parsed = null;
+    if (jsonMatch) {
+      try {
+        parsed = JSON.parse(jsonMatch[0]);
+      } catch (e) {
+        console.error('❌ JSON parse error:', e);
+      }
     }
+
+    if (parsed && parsed.ja && parsed.vi) {
+      // 履歴保存
+      const newHistory = [
+        ...history,
+        { role: 'user', content: 'もっと詳しくMiuにきく' },
+        { role: 'assistant', content: JSON.stringify(parsed) }
+      ];
+
+      await supabase
+        .from('users')
+        .update({ conversation_history: newHistory })
+        .eq('user_id', userId);
+
+      const flexMessage = createBilingualFlexMessage(parsed, true);
+
+      if (currentMode === MODES.TRANSLATE) {
+        flexMessage.quickReply = {
+          items: [
+            {
+              type: 'action',
+              action: {
+                type: 'message',
+                label: '他にも翻訳する',
+                text: '他にも翻訳する',
+              },
+            },
+          ],
+        };
+      }
+
+      try {
+        return await client.replyMessage({
+          replyToken,
+          messages: [flexMessage],
+        });
+      } catch (replyError) {
+        if (replyError.body && replyError.body.includes('Invalid reply token')) {
+          return await client.pushMessage({
+            to: userId,
+            messages: [flexMessage],
+          });
+        }
+        throw replyError;
+      }
+    }
+    
+  } catch (error) {
+    console.error('❌ [DEBUG] "もっと詳しくMiuにきく" 処理中にエラー:', error);
+    
+    try {
+      return await client.pushMessage({
+        to: userId,
+        messages: [{
+          type: 'text',
+          text: '処理中にエラーが発生しました💦\n\nもう一度試してみてください😊'
+        }]
+      });
+    } catch (pushError) {
+      console.error('❌ pushMessage also failed:', pushError);
+    }
+  }
+}
+
+  if (text === '/camera-translate') {
+    await supabase
+      .from('users')
+      .update({ mode: MODES.TRANSLATE })
+      .eq('user_id', userId);
+
+    return client.replyMessage({
+      replyToken,
+      messages: [{
+        type: 'text',
+        text: '📷 カメラで撮影して送ってね!\n翻訳するよ✨',
+        quickReply: {
+          items: [
+            {
+              type: 'action',
+              action: {
+                type: 'camera',
+                label: 'カメラ起動'
+              }
+            },
+            {
+              type: 'action',
+              action: {
+                type: 'cameraRoll',
+                label: 'アルバムから選択'
+              }
+            }
+          ]
+        }
+      }]
+    });
+  }
+
+
+  if (!user.japanese_level) {
+    return await promptJapaneseLevel(replyToken);
+  }
+
+  if (todayCount >= (limits[plan] || limits.free)) {
+    return await sendUsageLimitMessage(replyToken, plan, todayCount, limits);
+  }
+
+  if (text.startsWith('/mode ')) {
+    return await handleModeCommand(text, userId, replyToken, user);
+  }
+
+  if (text.startsWith('/reply_style ')) {
+    return await handleReplyStyleCommand(text, userId, replyToken, user);
+  }
+
+  if (text.startsWith('/anime_style ')) {
+    return await handleAnimeStyleCommand(text, userId, replyToken, user);
+  }
+
+  if (text.startsWith('/image_size ')) {
+    return await handleImageSizeCommand(text, userId, replyToken, user);
+  }
+
+  await showLoadingAnimation(userId);
+  await incrementUsageCount(userId);
+
+return await callOpenAI(text, currentMode, user, replyToken, userId);}
+
 
     if (messageType === 'image') {
+  if (!user.japanese_level) {
+    return await promptJapaneseLevel(replyToken);
+  }
+
+  if (todayCount >= (limits[plan] || limits.free)) {
+    return await sendUsageLimitMessage(replyToken, plan, todayCount, limits);
+  }
+
+  console.log('📸 Image received');
+  console.log('Current mode:', currentMode);
+  console.log('User anime_style:', user.anime_style);
+  console.log('User image_size:', user.image_size);
+
+  // ✅ IMAGE_ANIMEモードかつ選択画面を表示する場合はローディングとカウントをスキップ
+  if (currentMode === MODES.IMAGE_ANIME && (!user.anime_style || !user.image_size)) {
+    console.log('✅ Showing selection screen WITHOUT loading and count');
+    return await handleImageProcessing(event.message.id, currentMode, user, replyToken, userId);
+  }
+
+  // ✅ スタイルとサイズが両方選択済みの場合のみローディングとカウント
+  console.log('🎨 Processing image WITH loading animation and count');
+  await showLoadingAnimation(userId);
+  await incrementUsageCount(userId);
+
+  return await handleImageProcessing(event.message.id, currentMode, user, replyToken, userId);
+}
+
+  // 🎤🎤🎤 音声メッセージ処理を追加 🎤🎤🎤
+    if (messageType === 'audio') {
       if (!user.japanese_level) {
         return await promptJapaneseLevel(replyToken);
       }
@@ -217,11 +583,36 @@ async function handleEvent(event) {
         return await sendUsageLimitMessage(replyToken, plan, todayCount, limits);
       }
 
-      await showLoadingAnimation(userId);
-      await incrementUsageCount(userId);
+      console.log('🎤 Audio message received');
 
-      return await handleImageProcessing(event.message.id, currentMode, user, replyToken, userId);
+      try {
+        // ローディングアニメーション表示
+        await showLoadingAnimation(userId);
+        
+        // 使用回数カウント
+        await incrementUsageCount(userId);
+
+        // 音声を文字起こし
+        const transcribedText = await transcribeAudio(event.message.id);
+        
+        console.log('✅ Transcription:', transcribedText);
+
+        // 文字起こし結果をOpenAIに送信
+        return await callOpenAI(transcribedText, currentMode, user, replyToken, userId);
+
+      } catch (error) {
+        console.error('❌ Audio processing error:', error);
+        
+        return await client.replyMessage({
+          replyToken,
+          messages: [{
+            type: 'text',
+            text: '音声の処理中にエラーが発生しました💦\n\nもう一度送信してみてください😊'
+          }]
+        });
+      }
     }
+    // 🎤🎤🎤 音声処理ここまで 🎤🎤🎤
 
     console.log('Unsupported message type:', messageType);
     return null;
@@ -238,6 +629,61 @@ async function handleEvent(event) {
     } catch (replyError) {
       console.error('Failed to send error message:', replyError);
     }
+  }
+}
+
+async function transcribeAudio(audioId) {
+  const FormData = require('form-data');
+  
+  try {
+    console.log('🎤 Starting audio transcription...');
+    
+    // LINEから音声データを取得
+    const blobClient = new line.messagingApi.MessagingApiBlobClient({
+      channelAccessToken: config.channelAccessToken,
+    });
+    
+    const stream = await blobClient.getMessageContent(audioId);
+    const chunks = [];
+    
+    for await (const chunk of stream) {
+      chunks.push(Buffer.from(chunk));
+    }
+    
+    const audioBuffer = Buffer.concat(chunks);
+    console.log(`✅ Audio buffer created: ${audioBuffer.length} bytes`);
+
+    // ✅ FormDataを正しく作成
+    const formData = new FormData();
+    formData.append('file', audioBuffer, {
+      filename: 'audio.m4a',
+      contentType: 'audio/m4a',
+    });
+    formData.append('model', 'whisper-1');
+    formData.append('language', 'ja');
+
+    // ✅ fetchではなくaxiosを使う方法
+    const axios = require('axios');
+    
+    const response = await axios.post(
+      'https://api.openai.com/v1/audio/transcriptions',
+      formData,
+      {
+        headers: {
+          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+          ...formData.getHeaders(),
+        },
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity,
+      }
+    );
+
+    console.log('✅ Whisper result:', response.data);
+    return response.data.text;
+
+  } catch (error) {
+    console.error('❌ Transcription error:', error.response?.data || error.message);
+    throw error;
   }
 }
 
@@ -327,7 +773,8 @@ async function getOrCreateUser(userId, displayName) {
     japanese_level: null,
     reply_style: 'friend',
     anime_style: 'ninja-battle', 
-      image_size: 'null', // ✅ 追加
+      image_size: 'null', 
+      conversation_history: [],// ✅ 追加
   };
 
   try {
@@ -537,9 +984,16 @@ async function handleModeCommand(text, userId, replyToken, user) {
     });
   }
 
-  // ✅ IMAGE_ANIME モードの場合は先に return
+  // ✅ IMAGE_ANIME モードの場合
   if (nextMode === MODES.IMAGE_ANIME) {
-    await supabase.from('users').update({ mode: MODES.IMAGE_ANIME }).eq('user_id', userId);
+    // ✅ モード切替時にサイズをリセット
+    await supabase.from('users').update({ 
+      mode: MODES.IMAGE_ANIME,
+      image_size: null  // ✅ サイズをリセット
+    }).eq('user_id', userId);
+    
+    console.log(`✅ Switched to IMAGE_ANIME mode, image_size reset to null for user: ${userId}`);
+    
     return sendAnimeStyleSelection(replyToken);
   }
 
@@ -620,10 +1074,13 @@ async function handleAnimeStyleCommand(text, userId, replyToken, user) {
   }
 
   // ユーザーの選択したスタイルをSupabaseに保存
-  try {
+   try {
     await supabase
       .from('users')
-      .update({ anime_style: styleKey })
+      .update({ 
+        anime_style: styleKey,
+        image_size: null  // ✅ サイズをリセット
+      })
       .eq('user_id', userId);
 
     console.log(`✅ Anime style set to: ${styleKey} for user: ${userId}`);
@@ -688,7 +1145,7 @@ async function handleImageSizeCommand(text, userId, replyToken, user) {
     try {
       // Step 1: 画像の内容を理解
       const analysisCompletion = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4o',
         messages: [
           {
             role: 'user',
@@ -833,8 +1290,7 @@ async function callOpenAI(userMessage, mode, user, replyToken, userId) {
     try {
       console.log('🎨 Starting text-to-image generation...');
 
-      // ✅ ユーザーが選択したスタイルを取得
-      const selectedStyleKey = user.anime_style || 'ninja-battle'; // ✅ デフォルトを修正
+      const selectedStyleKey = user.anime_style || 'ninja-battle';
       const selectedStyle = ANIME_STYLES[selectedStyleKey];
 
       if (!selectedStyle) {
@@ -850,9 +1306,8 @@ async function callOpenAI(userMessage, mode, user, replyToken, userId) {
 
       console.log(`🎨 Using style: ${selectedStyle.label}`);
 
-      // 日本語を英語に翻訳してプロンプト作成
       const translationCompletion = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4o',
         messages: [
           {
             role: 'system',
@@ -868,21 +1323,20 @@ async function callOpenAI(userMessage, mode, user, replyToken, userId) {
       const translatedDescription = translationCompletion.choices[0].message.content;
       console.log('📝 Translated description:', translatedDescription);
 
-      // DALL-E 3で選択されたスタイルの画像を生成
       const prompt = `${selectedStyle.prompt}. Subject: ${translatedDescription}. High quality anime illustration, professional art, detailed and expressive.`;
 
       const selectedSizeKey = user.image_size || 'square';
-        const selectedSizeObj = IMAGE_SIZES[selectedSizeKey];
+      const selectedSizeObj = IMAGE_SIZES[selectedSizeKey];
 
-        console.log(`📐 Using size: ${selectedSizeObj.label} (${selectedSizeObj.size})`);
+      console.log(`📐 Using size: ${selectedSizeObj.label} (${selectedSizeObj.size})`);
 
-        const imageResponse = await openai.images.generate({
-          model: 'dall-e-3',
-          prompt: prompt,
-          n: 1,
-          size: selectedSizeObj.size, // ✅ ユーザーが選んだサイズを使用
-          quality: 'standard',
-        });
+      const imageResponse = await openai.images.generate({
+        model: 'dall-e-3',
+        prompt: prompt,
+        n: 1,
+        size: selectedSizeObj.size,
+        quality: 'standard',
+      });
 
       const generatedImageUrl = imageResponse.data[0].url;
       console.log('✅ Image generated:', generatedImageUrl);
@@ -918,39 +1372,184 @@ async function callOpenAI(userMessage, mode, user, replyToken, userId) {
     }
   }
 
-  // 他のモードの処理（既存のコード）
+    const history = Array.isArray(user.conversation_history) ? user.conversation_history : [];
+
+  const MAX_TOKENS = 9000;
+  const MAX_CHARS = MAX_TOKENS * 4;
+
+  let totalChars = 0;
+  const limitedHistory = [];
+
+  for (let i = history.length - 1; i >= 0; i--) {
+    const msg = history[i];
+    const len = (msg.content || '').length;
+
+    if (totalChars + len > MAX_CHARS) break;
+
+    limitedHistory.unshift(msg);
+    totalChars += len;
+  }
+
   const systemPrompt = buildSystemPrompt(mode, user.japanese_level, user.reply_style);
 
-  try {
+  const messages = [
+    { role: 'system', content: systemPrompt },
+    ...limitedHistory,
+    { role: 'user', content: userMessage },
+  ];
+
+   try {
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userMessage },
-      ],
+      model: 'gpt-4o',
+      messages,
       temperature: 0.7,
     });
 
     const responseText = completion.choices[0].message.content;
     console.log('🤖 OpenAI Response:', responseText);
 
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    // ✅ Markdownコードブロックを除去してからJSONを抽出
+    let cleanedText = responseText;
+    
+    cleanedText = cleanedText.replace(/```json\s*/g, '');
+    cleanedText = cleanedText.replace(/```\s*/g, '');
+    
+    const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
 
+    let parsed = null;
     if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
-      const isJapanese = /[ぁ-んァ-ヴー一-鿿]/.test(userMessage);
-      const flexMessage = createBilingualFlexMessage(parsed, isJapanese);
-
-      return await client.replyMessage({ replyToken, messages: [flexMessage] });
-    } else {
-      return await client.replyMessage({ replyToken, messages: [{ type: 'text', text: responseText }] });
+      try {
+        parsed = JSON.parse(jsonMatch[0]);
+      } catch (e) {
+        console.error('❌ JSON parse error:', e);
+        console.error('📄 Failed to parse:', jsonMatch[0].substring(0, 500));
+      }
     }
-  } catch (error) {
+    
+    if (parsed && parsed.ja && parsed.vi) {
+      // 履歴保存
+      try {
+        const newHistory = [
+          ...limitedHistory,
+          { role: 'user', content: userMessage },
+          { role: 'assistant', content: JSON.stringify(parsed) }
+        ];
+
+        await supabase
+          .from('users')
+          .update({ conversation_history: newHistory })
+          .eq('user_id', userId);
+
+        console.log('✅ Conversation history saved');
+      } catch (historyError) {
+        console.error('❌ Failed to save history:', historyError);
+      }
+
+      const flexMessage = createBilingualFlexMessage(parsed, true);
+
+      if (mode === MODES.TRANSLATE) {
+        flexMessage.quickReply = {
+          items: [
+            {
+              type: 'action',
+              action: {
+                type: 'message',
+                label: 'もっと詳しくMiuにきく',
+                text: 'もっと詳しくMiuにきく',
+              },
+            },
+            {
+              type: 'action',
+              action: {
+                type: 'message',
+                label: '他にも翻訳する',
+                text: '他にも翻訳する',
+              },
+            },
+          ],
+        };
+      }
+
+      // ✅ replyMessage を試して、失敗したら pushMessage
+      try {
+        return await client.replyMessage({
+          replyToken,
+          messages: [flexMessage],
+        });
+      } catch (replyError) {
+        console.error('❌ replyMessage failed:', replyError.body || replyError.message);
+        
+        if (replyError.body && (replyError.body.includes('Invalid reply token') || replyError.body.includes('invalid'))) {
+          console.log('⚠️ Reply token invalid, using pushMessage instead');
+          
+          return await client.pushMessage({
+            to: userId,
+            messages: [flexMessage],
+          });
+        }
+        
+        throw replyError;
+      }
+    }
+
+    console.log('ℹ️ No JSON found in response, sending plain text.');
+    
+    // プレーンテキストの場合
+    try {
+      const newHistory = [
+        ...limitedHistory,
+        { role: 'user', content: userMessage },
+        { role: 'assistant', content: responseText }
+      ];
+
+      await supabase
+        .from('users')
+        .update({ conversation_history: newHistory })
+        .eq('user_id', userId);
+
+      console.log('✅ Conversation history saved (plain text)');
+    } catch (historyError) {
+      console.error('❌ Failed to save history:', historyError);
+    }
+
+    // ✅ replyMessage を試して、失敗したら pushMessage
+    try {
+      return await client.replyMessage({
+        replyToken,
+        messages: [{ type: 'text', text: responseText }],
+      });
+    } catch (replyError) {
+      console.error('❌ replyMessage failed:', replyError.body || replyError.message);
+      
+      if (replyError.body && (replyError.body.includes('Invalid reply token') || replyError.body.includes('invalid'))) {
+        console.log('⚠️ Reply token invalid, using pushMessage instead');
+        
+        return await client.pushMessage({
+          to: userId,
+          messages: [{ type: 'text', text: responseText }],
+        });
+      }
+      
+      throw replyError;
+    }
+  } 
+  catch (error) {
     console.error('❌ OpenAI API Error:', error);
-    return await client.replyMessage({
-      replyToken,
-      messages: [{ type: 'text', text: '申し訳ございません。処理中にエラーが発生しました。' }],
-    });
+    
+    // エラーメッセージも pushMessage フォールバック
+    try {
+      return await client.replyMessage({
+        replyToken,
+        messages: [{ type: 'text', text: '申し訳ございません。処理中にエラーが発生しました。' }],
+      });
+    } catch (replyError) {
+      console.log('⚠️ Reply token invalid, using pushMessage for error');
+      
+      return await client.pushMessage({
+        to: userId,
+        messages: [{ type: 'text', text: '申し訳ございません。処理中にエラーが発生しました。' }],
+      });
+    }
   }
 }
 
@@ -964,7 +1563,6 @@ async function handleImageProcessing(messageId, mode, user, replyToken, userId) 
     console.log('User anime_style:', user.anime_style);
     console.log('User image_size:', user.image_size);
     
-    // ✅ 正しいメソッド名で画像取得
     const blobClient = new line.messagingApi.MessagingApiBlobClient({
       channelAccessToken: config.channelAccessToken,
     });
@@ -972,7 +1570,6 @@ async function handleImageProcessing(messageId, mode, user, replyToken, userId) 
     const stream = await blobClient.getMessageContent(messageId);
     const chunks = [];
     
-    // ReadableStreamの処理
     for await (const chunk of stream) {
       chunks.push(Buffer.from(chunk));
     }
@@ -982,53 +1579,65 @@ async function handleImageProcessing(messageId, mode, user, replyToken, userId) 
     
     console.log(`✅ Image buffer created: ${buffer.length} bytes`);
 
+    try {
+  await supabase
+    .from('users')
+    .update({ 
+      temp_image_base64: base64Image,
+      temp_image_timestamp: new Date().toISOString()
+    })
+    .eq('user_id', userId);
+  
+  console.log('✅ Image temporarily saved for follow-up');
+} catch (saveError) {
+  console.error('❌ Failed to save temporary image:', saveError);
+}
+    
     if (mode === MODES.IMAGE_ANIME) {
-      // ✅ スタイルが選択済みだが、サイズが未選択の場合
       if (user.anime_style && !user.image_size) {
         console.log('📸 Image received, showing size selection...');
         
-        // 画像を一時的にSupabaseに保存
         try {
           await supabase
-            .from('users')
-            .update({ 
-              pending_image_id: messageId,
-              pending_image_base64: base64Image 
-            })
-            .eq('user_id', userId);
-          
-          console.log('✅ Image saved to pending');
+  .from('users')
+  .update({ 
+    conversation_history: limitedNewHistory,
+    temp_image_base64: base64Image,  // ✅ 一時保存
+    temp_image_timestamp: new Date().toISOString()  // ✅ 保存時刻
+  })
+  .eq('user_id', userId);
+
+console.log('✅ Image temporarily saved for follow-up');
+
         } catch (e) {
           console.error('Failed to save pending image:', e);
         }
 
-        // サイズ選択画面を表示
         const selectedStyle = ANIME_STYLES[user.anime_style];
         return sendImageSizeSelection(replyToken, selectedStyle);
       }
 
-      // ✅ スタイルもサイズも未選択の場合
       if (!user.anime_style) {
         console.log('📸 Image received but no style, showing style selection...');
         
-        // 画像を一時的にSupabaseに保存
         try {
           await supabase
             .from('users')
             .update({ 
               pending_image_id: messageId,
-              pending_image_base64: base64Image 
+              pending_image_base64: base64Image,
+              image_size: null
             })
             .eq('user_id', userId);
+          
+          console.log('✅ Image saved to pending, image_size set to null');
         } catch (e) {
           console.error('Failed to save pending image:', e);
         }
 
-        // スタイル選択画面を表示
         return sendAnimeStyleSelection(replyToken);
       }
 
-      // ✅ スタイルとサイズが両方選択済みの場合のみ、画像処理を実行
       try {
         console.log('🎨 Starting anime conversion...');
 
@@ -1048,9 +1657,8 @@ async function handleImageProcessing(messageId, mode, user, replyToken, userId) 
 
         console.log(`🎨 Using style: ${selectedStyle.label}`);
 
-        // Step 1: 画像の内容を理解
         const analysisCompletion = await openai.chat.completions.create({
-          model: 'gpt-4o-mini',
+          model: 'gpt-4o',
           messages: [
             {
               role: 'user',
@@ -1072,7 +1680,6 @@ async function handleImageProcessing(messageId, mode, user, replyToken, userId) 
         const imageDescription = analysisCompletion.choices[0].message.content;
         console.log('📝 Image description:', imageDescription);
 
-        // Step 2: 選択されたスタイル&サイズで画像生成
         const prompt = `${selectedStyle.prompt}. Subject: ${imageDescription}. High quality anime illustration, professional art, detailed and expressive.`;
 
         const selectedSizeKey = user.image_size || 'square';
@@ -1106,17 +1713,13 @@ async function handleImageProcessing(messageId, mode, user, replyToken, userId) 
           ],
         });
       } catch (error) {
-        console.error('❌ Anime conversion error:', error);
+        console.error('❌ Image processing error:', error);
         
-        if (error.response) {
-          console.error('API Error:', error.response.data);
-        }
-
         return await client.replyMessage({
           replyToken,
           messages: [{
             type: 'text',
-            text: 'アニメ風変換中にエラーが発生しました💦\n\nもう一度送信してみてください😊',
+            text: '画像の処理中にエラーが発生しました💦\n\nもう一度送信してみてください😊',
           }],
         });
       }
@@ -1126,7 +1729,7 @@ async function handleImageProcessing(messageId, mode, user, replyToken, userId) 
     const systemPrompt = buildSystemPrompt(mode, user.japanese_level, user.reply_style);
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: 'gpt-4o',
       messages: [
         { role: 'system', content: systemPrompt },
         {
@@ -1140,18 +1743,176 @@ async function handleImageProcessing(messageId, mode, user, replyToken, userId) 
       temperature: 0.7,
     });
 
-    const responseText = completion.choices[0].message.content;
-    console.log('🤖 OpenAI Image Response:', responseText);
+    if (mode === MODES.TRANSLATE) {
+      const systemPrompt = buildSystemPrompt(mode, user.japanese_level, user.reply_style);
 
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: '画像内のテキストを認識して処理してください。' },
+              { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64Image}` } },
+            ],
+          },
+        ],
+        temperature: 0.7,
+      });
 
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
-      const flexMessage = createBilingualFlexMessage(parsed, true);
-      return await client.replyMessage({ replyToken, messages: [flexMessage] });
-    } else {
-      return await client.replyMessage({ replyToken, messages: [{ type: 'text', text: responseText }] });
+      const responseText = completion.choices[0].message.content;
+      console.log('🤖 OpenAI Image Response:', responseText);
+
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+
+      if (jsonMatch) {
+        let parsed = null;
+        try {
+          parsed = JSON.parse(jsonMatch[0]);
+        } catch (e) {
+          console.error('❌ JSON parse error (image):', e);
+        }
+
+        if (parsed && parsed.ja && parsed.vi) {
+          try {
+            const { data: userData } = await supabase
+              .from('users')
+              .select('conversation_history')
+              .eq('user_id', userId)
+              .single();
+
+            const currentHistory = Array.isArray(userData?.conversation_history) 
+              ? userData.conversation_history 
+              : [];
+
+            const newHistory = [
+              ...currentHistory,
+              { role: 'user', content: '[画像を送信]' },
+              { role: 'assistant', content: JSON.stringify(parsed) }
+            ];
+
+            const MAX_TOKENS = 9000;
+            const MAX_CHARS = MAX_TOKENS * 4;
+            let totalChars = 0;
+            const limitedNewHistory = [];
+
+            for (let i = newHistory.length - 1; i >= 0; i--) {
+              const msg = newHistory[i];
+              const len = (msg.content || '').length;
+              if (totalChars + len > MAX_CHARS) break;
+              limitedNewHistory.unshift(msg);
+              totalChars += len;
+            }
+
+            await supabase
+              .from('users')
+              .update({ conversation_history: limitedNewHistory })
+              .eq('user_id', userId);
+
+            console.log('✅ Image translation history saved');
+          } catch (historyError) {
+            console.error('❌ Failed to save image history:', historyError);
+          }
+
+          const flexMessage = createBilingualFlexMessage(parsed, true);
+
+          flexMessage.quickReply = {
+            items: [
+              {
+                type: 'action',
+                action: {
+                  type: 'message',
+                  label: 'もっと詳しくMiuにきく',
+                  text: 'もっと詳しくMiuにきく',
+                },
+              },
+              {
+                type: 'action',
+                action: {
+                  type: 'message',
+                  label: '他にも翻訳する',
+                  text: '他にも翻訳する',
+                },
+              },
+            ],
+          };
+
+          return await client.replyMessage({ replyToken, messages: [flexMessage] });
+        }
+      }
+
+      console.log('ℹ️ No valid JSON from image response, sending plain text.');
+      return await client.replyMessage({
+        replyToken,
+        messages: [{ type: 'text', text: responseText }],
+      });
     }
+
+    // ✅ Miuチャットモード: 画像について会話
+     if (mode === MODES.MIU_CHAT) {
+      const systemPrompt = buildSystemPrompt(mode, user.japanese_level, user.reply_style);
+
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: 'この画像について教えて!' },
+              { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64Image}` } },
+            ],
+          },
+        ],
+        temperature: 0.7,
+      });
+
+      const responseText = completion.choices[0].message.content;
+      console.log('🤖 Miu Image Chat Response:', responseText);
+
+      // ✅ JSONが返ってきた場合はパースしてFlexメッセージで表示
+      let cleanedText = responseText;
+      cleanedText = cleanedText.replace(/```json\s*/g, '');
+      cleanedText = cleanedText.replace(/```\s*/g, '');
+      
+      const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
+
+      if (jsonMatch) {
+        try {
+          const parsed = JSON.parse(jsonMatch[0]);
+          
+          if (parsed && parsed.ja && parsed.vi) {
+            console.log('✅ JSON parsed successfully, sending Flex message');
+            
+            const flexMessage = createBilingualFlexMessage(parsed, false);
+            
+            return await client.replyMessage({
+              replyToken,
+              messages: [flexMessage],
+            });
+          }
+        } catch (e) {
+          console.error('❌ JSON parse error:', e);
+        }
+      }
+
+      // ✅ JSONでない場合はプレーンテキストで送信
+      return await client.replyMessage({
+        replyToken,
+        messages: [{ type: 'text', text: responseText }],
+      });
+    }
+
+    // ✅ その他のモード: 画像は使えません
+    return await client.replyMessage({
+      replyToken,
+      messages: [{
+        type: 'text',
+        text: 'このモードでは画像は使えないよ💦\nテキストで送ってね😊'
+      }]
+    });
+
   } catch (error) {
     console.error('❌ Image processing error:', error);
     
@@ -1194,19 +1955,84 @@ function buildSystemPrompt(mode, japaneseLevel, replyStyle) {
       break;
 
     case MODES.TRANSLATE:
-      basePrompt = `あなたは「日本語⇄ベトナム語(やさしい日本語)」の翻訳アシスタントです。
+  basePrompt = `あなたは「画像理解＋翻訳＋会話提案」を行うAIアシスタントのMiuです。
 
-【役割】
-- 入力された難しい日本語を、分かりやすく翻訳する
-- 書類、看板、メニュー、手紙などの翻訳が得意
+【タスク】
+1. 入力されたテキストまたは画像の内容を正確に理解する  
+2. 日本語のテキストを
+   - ベトナム語（自然で正確）
+   - やさしい日本語（ユーザーのレベルに合わせた日本語）
+   の2つに翻訳する
+3. 翻訳が終わったら、ユーザーが興味を持ちそうな
+   「次の質問候補」を2つ提案する（クイックリプライ用）
+4. コンテンツの種類に応じて、提案内容を変える：
+   - お菓子・食品 → 味・食べ方・人気の理由・似ている商品・文化の違い など
+   - メニュー → おすすめ料理、味のイメージ、辛さ・アレルギー・ハラールなどの注意
+   - 行政書類・住民票 → どこが大事か、どこに出す書類か、よくある質問
+   - 契約書・重要書類 → 注意すべきポイント、サイン前に確認した方がいい点
+   - マニュアル・説明書 → 手順の要約、よく間違えるポイント
+   - 看板・ポスター → 意味の補足、安全情報、注意点
+5. 認識が不確かな場合は「たぶん〜です」と表現し、断定しないこと
 
-【翻訳ルール】
-- 必ず2つの言語で出力する:
-  1. ベトナム語(正確で自然な翻訳)
-  2. やさしい日本語(ユーザーのレベルに合わせる)
-- 専門用語や固有名詞は、そのまま残してもOK
-- 翻訳だけでなく、「これは〇〇書類です」などの説明も加える`;
-      break;
+【出力内容のイメージ】
+1. 画像／テキストの内容を一文で説明（やさしい日本語）
+2. ベトナム語での説明＋翻訳
+3. やさしい日本語での説明＋翻訳
+4. ユーザーが「次に押したくなるボタン」になりそうな質問を2つ
+
+【followups（次の質問候補）のルール】
+あなたは翻訳が終わったあと、ユーザーが次に知りたがりそうな質問を
+「内容深掘り型」と「生活拡張型」の2種類で作り分ける。
+
+1つ目（内容深掘り型）
+- 今翻訳した対象に直接関係する質問にする
+- 内容をより理解したり補足したりするための質問
+- 例:
+  - 「この書類で一番大事な部分は？」
+  - 「この料理の味を詳しく知りたい」
+  - 「どの点に気をつければいい？」
+
+2つ目（生活拡張型）
+- ユーザーの生活全体につながる質問にする
+- 新しい悩み相談の入口になる質問
+- 例:
+  - 「似た書類で不安なものある？」
+  - 「他に節約したいものは？」
+  - 「最近困っていることある？」
+
+【禁止事項】
+- 質問2つの意味を似せない
+- 商品名・固有名詞を両方に連続で入れない（片方だけOK）
+- 書類・契約・支払いなどの時は、軽い表現「安心だよ」「大丈夫だよ」を使わない
+
+
+【カテゴリ別ガイドライン】
+
+▼ お金・支払い・請求書（家賃保証・光熱費・携帯・税金など）
+- 請求書は「支払い義務のある正式な書類」として説明する。
+- 支払先の役割を説明する（例: 家賃保証 → オーナーに家賃を立て替える会社）。
+- ユーザーにとっては**実質的な支払先**であることを明確に伝える。
+- 支払期限が読める場合は必ず拾う。
+- 期限が過ぎている可能性があれば、「早めに対応しましょう」と注意喚起する。
+- 「安心だね」「大丈夫だよ」のように、支払いを軽く見せる表現は使わない。
+- 代わりに「内容をよく確認しましょう」「不安なら会社や大家さんに相談しましょう」と伝える。
+
+▼ 契約・更新・解約（賃貸契約、更新通知、携帯契約など）
+- 書類の種類をまず説明する（更新案内・解約案内など）。
+- ユーザーがやるべき行動（サイン、返送、連絡など）を整理して伝える。
+- 「不利益はありません」「問題ないです」とは断定しない。
+- 気になる場合は「管理会社・ショップに確認しましょう」と促す。
+
+▼ 役所・在留資格・行政書類（住民票、在留カード、マイナンバー、税金通知など）
+- 書類の目的（何のための書類か）を簡潔に説明する。
+- 期限・必要書類・手続き場所など、読み取れる範囲だけ整理して伝える。
+- 法律や在留資格まわりは絶対に断定せず、
+  「公式サイトや役所で最新情報を確認することをおすすめします」
+  と案内する。
+`;
+  break;
+
+
 
     case MODES.MIU_CHAT:
       basePrompt = `あなたは「Miu🐱」という名前の、ベトナム人向け日本生活サポートAIです。
@@ -1400,13 +2226,13 @@ function buildSystemPrompt(mode, japaneseLevel, replyStyle) {
   - 笑い方: 「ウシシシ」「にひひ」
 
 **📚 ルフィの名言を参考に**:
-- 「海賊王におれはなる！！！！」（1巻）
-- 「お前が死んでも、おれは死なねェぞ」（8巻）
-- 「仲間だろうが！！！」（10巻）
-- 「嫌いだ！！！」（シンプルな感情表現、20巻）
-- 「うるせェ！！！行こう！！！」（24巻）
-- 「当たり前だ！！！」（37巻）
-- 「"生きたい"と言えェ！」（41巻）
+- 「海賊王におれはなる！！！！」
+- 「お前が死んでも、おれは死なねェぞ」
+- 「仲間だろうが！！！」
+- 「嫌いだ！！！」
+- 「うるせェ！！！行こう！！！」
+- 「当たり前だ！！！」
+- 「"生きたい"と言えェ！」
 
 **🎭 具体的な使用例**:
 
@@ -1525,6 +2351,40 @@ ${replyStylePrompts[replyStyle] || replyStylePrompts['friend']}
       break;
   }
 
+if (mode === MODES.TRANSLATE) {
+    return `${basePrompt}
+
+【日本語レベル調整】
+${level}
+
+【❗必須・出力形式】
+必ず以下のJSON形式「だけ」を出力してください:
+
+{
+  "ja": "やさしい日本語での説明と翻訳",
+  "vi": "ベトナム語での説明と翻訳",
+  "followups": [
+    {
+      "label": "ボタンに表示する短い日本語",
+      "text": "Miu に送る実際のメッセージ（日本語推奨）"
+    },
+    {
+      "label": "2つめのボタンの日本語",
+      "text": "Miu に送る実際のメッセージ（日本語推奨）"
+    }
+  ]
+}
+
+【重要ルール】
+- JSON以外の文字（説明文、日本語の文章など）は一切出力しない
+- "ja" には「画像／テキストの簡単な説明＋翻訳」を、ユーザーの日本語レベルに合わせた「やさしい日本語」でまとめる
+- "vi" にはベトナム語で同じ内容を自然にまとめる
+- "followups" には、ユーザーが「次に押したくなる」質問を2つ必ず入れる
+- followups の label は 10〜16文字くらいの短い日本語
+- followups の text は、そのまま送って自然な会話になる文（日本語推奨）
+- 書類・メニュー・お菓子・ポスターなど、内容にあわせて**毎回中身を変えること**（サンプルをそのままコピーしないこと）`;
+  }
+  
   return `${basePrompt}
 
 【日本語レベル調整】
@@ -1584,46 +2444,87 @@ function createBilingualFlexMessage(aiResponse, isJapaneseInput) {
 
   const sections = isJapaneseInput
     ? [
-        { label: '🟢 日本語', color: '#1DB446', spans: jaSpans, copyText: aiResponse.ja, copyLabel: '日本語をコピー', copyData: 'copy_ja' },
-        { label: '🔴 Tiếng Việt', color: '#DA251D', spans: viSpans, copyText: aiResponse.vi, copyLabel: 'ベトナム語をコピー', copyData: 'copy_vi' },
+        {
+          label: '🟢 日本語',
+          color: '#1DB446',
+          spans: jaSpans,
+        },
+        {
+          label: '🔴 Tiếng Việt',
+          color: '#DA251D',
+          spans: viSpans,
+        },
       ]
     : [
-        { label: '🔴 Tiếng Việt', color: '#DA251D', spans: viSpans, copyText: aiResponse.vi, copyLabel: 'ベトナム語をコピー', copyData: 'copy_vi' },
-        { label: '🟢 日本語', color: '#1DB446', spans: jaSpans, copyText: aiResponse.ja, copyLabel: '日本語をコピー', copyData: 'copy_ja' },
+        {
+          label: '🔴 Tiếng Việt',
+          color: '#DA251D',
+          spans: viSpans,
+        },
+        {
+          label: '🟢 日本語',
+          color: '#1DB446',
+          spans: jaSpans,
+        },
       ];
 
   const bodyContents = [];
   sections.forEach((section, idx) => {
-    if (idx > 0) bodyContents.push({ type: 'separator', margin: 'lg' });
-    bodyContents.push({ type: 'text', text: section.label, weight: 'bold', size: 'sm', color: section.color, margin: idx === 0 ? 'none' : 'lg' });
-    bodyContents.push({ type: 'text', wrap: true, margin: 'md', contents: section.spans });
+    if (idx > 0) {
+      bodyContents.push({ type: 'separator', margin: 'lg' });
+    }
+    bodyContents.push({
+      type: 'text',
+      text: section.label,
+      weight: 'bold',
+      size: 'sm',
+      color: section.color,
+      margin: idx === 0 ? 'none' : 'lg',
+    });
+    bodyContents.push({
+      type: 'text',
+      wrap: true,
+      margin: 'md',
+      contents: section.spans,
+    });
   });
 
-  return {
+  // ✅ followups があればクイックリプライを作る
+  let quickReply = undefined;
+  if (Array.isArray(aiResponse.followups) && aiResponse.followups.length > 0) {
+    const items = aiResponse.followups.slice(0, 2).map((f) => ({
+      type: 'action',
+      action: {
+        type: 'message',
+        label: f.label || '質問する',
+        text: f.text || f.label || 'この内容について教えて',
+      },
+    }));
+
+    quickReply = { items };
+  }
+
+  // ✅ footerを削除してシンプルなFlexメッセージに
+  const flexMessage = {
     type: 'flex',
     altText: 'Miuの返信',
     contents: {
       type: 'bubble',
-      body: { type: 'box', layout: 'vertical', contents: bodyContents },
-      footer: {
+      body: {
         type: 'box',
         layout: 'vertical',
-        spacing: 'sm',
-        contents: sections.map((s) => ({
-          type: 'button',
-          style: 'primary',
-          height: 'sm',
-          color: '#fab536',
-          action: {
-            type: 'postback',
-            label: s.copyLabel,
-            data: JSON.stringify({ action: s.copyData, text: s.copyText }),
-            displayText: s.copyLabel
-          }
-        })),
+        contents: bodyContents,
       },
+      // footer は削除（コピーボタンなし）
     },
   };
+
+  // ✅ 必要なときだけ quickReply を付与
+  if (quickReply) {
+    flexMessage.quickReply = quickReply;
+  }
+
+  return flexMessage;
 }
 
 async function sendAnimeStyleSelection(replyToken) {
@@ -1934,4 +2835,68 @@ async function sendImageSizeSelection(replyToken, style) {
       },
     }],
   });
+}
+
+// ===============================
+// 🔄 リッチメニュー切り替え
+// ===============================
+
+// プロフィール完全性チェック
+function isProfileComplete(user) {
+  return !!(
+    user.japanese_level &&      // 日本語レベル
+    user.residence_status &&    // 在留資格
+    user.prefecture &&          // 都道府県
+    user.preferred_name         // 呼び名 (必須)
+  );
+}
+
+// リッチメニュー自動切り替え
+async function updateRichMenuByProfile(userId, user) {
+  const INCOMPLETE_MENU_ID = process.env.RICH_MENU_INCOMPLETE_ID;
+  const COMPLETE_MENU_ID = process.env.RICH_MENU_COMPLETE_ID;
+  
+  if (!INCOMPLETE_MENU_ID || !COMPLETE_MENU_ID) {
+    console.log('⚠️ Rich menu IDs not configured');
+    return;
+  }
+  
+  const isComplete = isProfileComplete(user);
+  const currentStatus = user.rich_menu_complete || false;
+  
+  // ✅ 完全 → 未完全 (情報を消した場合)
+  if (!isComplete && currentStatus) {
+    console.log(`⚠️ Profile became incomplete for user: ${userId}`);
+    
+    try {
+      await client.linkRichMenuToUser(userId, INCOMPLETE_MENU_ID);
+      
+      await supabase
+        .from('users')
+        .update({ rich_menu_complete: false })
+        .eq('user_id', userId);
+      
+      console.log('✅ Switched to incomplete rich menu');
+    } catch (error) {
+      console.error('❌ Failed to switch to incomplete menu:', error);
+    }
+  }
+  
+  // ✅ 未完全 → 完全 (情報を全部入力した場合)
+  if (isComplete && !currentStatus) {
+    console.log(`🎉 Profile completed for user: ${userId}`);
+    
+    try {
+      await client.linkRichMenuToUser(userId, COMPLETE_MENU_ID);
+      
+      await supabase
+        .from('users')
+        .update({ rich_menu_complete: true })
+        .eq('user_id', userId);
+      
+      console.log('✅ Switched to complete rich menu');
+    } catch (error) {
+      console.error('❌ Failed to switch to complete menu:', error);
+    }
+  }
 }
