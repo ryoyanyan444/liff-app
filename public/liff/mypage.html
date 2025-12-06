@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Miu マイページ</title>
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 500px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 20px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+      overflow: hidden;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%);
+      color: white;
+      padding: 30px 20px;
+      text-align: center;
+    }
+
+    .header h1 {
+      font-size: 24px;
+      margin-bottom: 5px;
+    }
+
+    .header p {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .content {
+      padding: 30px 20px;
+    }
+
+    .form-group {
+      margin-bottom: 25px;
+    }
+
+    label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #333;
+      font-size: 14px;
+    }
+
+    .required {
+      color: #FF6B6B;
+      margin-left: 3px;
+    }
+
+    input[type="text"],
+    select {
+      width: 100%;
+      padding: 12px 15px;
+      border: 2px solid #e0e0e0;
+      border-radius: 10px;
+      font-size: 16px;
+      transition: border-color 0.3s;
+      background: white;
+    }
+
+    input[type="text"]:focus,
+    select:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .language-toggle {
+      display: flex;
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    .language-toggle label {
+      flex: 1;
+      padding: 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 10px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s;
+      font-weight: 500;
+    }
+
+    .language-toggle input[type="radio"] {
+      display: none;
+    }
+
+    .language-toggle input[type="radio"]:checked + label {
+      background: #667eea;
+      color: white;
+      border-color: #667eea;
+    }
+
+    .stats {
+      background: #f8f9fa;
+      padding: 20px;
+      border-radius: 10px;
+      margin-bottom: 25px;
+    }
+
+    .stats h3 {
+      font-size: 16px;
+      margin-bottom: 15px;
+      color: #333;
+    }
+
+    .stat-item {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 10px;
+      font-size: 14px;
+    }
+
+    .stat-label {
+      color: #666;
+    }
+
+    .stat-value {
+      font-weight: 600;
+      color: #333;
+    }
+
+    .save-btn {
+      width: 100%;
+      padding: 15px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+    }
+
+    .save-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+    }
+
+    .save-btn:active {
+      transform: translateY(0);
+    }
+
+    .save-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 50px 20px;
+      color: #666;
+    }
+
+    .spinner {
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #667eea;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 20px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .error {
+      background: #ffe6e6;
+      color: #d32f2f;
+      padding: 15px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+      font-size: 14px;
+      border-left: 4px solid #d32f2f;
+    }
+
+    .success {
+      background: #e8f5e9;
+      color: #2e7d32;
+      padding: 15px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+      font-size: 14px;
+      border-left: 4px solid #2e7d32;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>👤 マイページ</h1>
+      <p>Trang cá nhân</p>
+    </div>
+
+    <div id="loading" class="loading">
+      <div class="spinner"></div>
+      <p>読み込み中...<br>Đang tải...</p>
+    </div>
+
+    <div id="content" class="content hidden">
+      <div id="errorMessage" class="error hidden"></div>
+      <div id="successMessage" class="success hidden"></div>
+
+      <!-- 利用状況 -->
+      <div class="stats">
+        <h3>📊 利用状況 / Tình trạng sử dụng</h3>
+        <div class="stat-item">
+          <span class="stat-label">今日 / Hôm nay:</span>
+          <span class="stat-value" id="usageCount">-</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">プラン / Gói:</span>
+          <span class="stat-value" id="plan">-</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">累計 / Tổng cộng:</span>
+          <span class="stat-value" id="totalUsage">-</span>
+        </div>
+      </div>
+
+      <!-- プロフィールフォーム -->
+      <form id="profileForm">
+        <div class="form-group">
+          <label>名前 / Tên <span class="required">*</span></label>
+          <input type="text" id="name" required placeholder="例: Nguyen Van A">
+        </div>
+
+        <div class="form-group">
+          <label>日本語レベル / Trình độ tiếng Nhật</label>
+          <select id="japaneseLevel">
+            <option value="">選択してください / Vui lòng chọn</option>
+            <option value="N5">N5</option>
+            <option value="N4">N4</option>
+            <option value="N3">N3</option>
+            <option value="N2">N2</option>
+            <option value="N1">N1</option>
+            <option value="なし">なし / Không có</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>在留資格 / Tư cách lưu trú <span class="required">*</span></label>
+          <select id="residenceStatus" required>
+            <option value="">選択してください / Vui lòng chọn</option>
+            <option value="技能実習">技能実習 / Thực tập kỹ năng</option>
+            <option value="特定技能">特定技能 / Kỹ năng đặc định</option>
+            <option value="留学">留学 / Du học</option>
+            <option value="家族滞在">家族滞在 / Gia đình lưu trú</option>
+            <option value="永住者">永住者 / Thường trú</option>
+            <option value="定住者">定住者 / Định cư</option>
+            <option value="日本人の配偶者等">日本人の配偶者等 / Vợ/chồng người Nhật</option>
+            <option value="永住者の配偶者等">永住者の配偶者等 / Vợ/chồng thường trú</option>
+            <option value="技術・人文知識・国際業務">技術・人文知識・国際業務 / Kỹ thuật/Kiến thức</option>
+            <option value="その他">その他 / Khác</option>
+          </select>
+        </div>
+
+        <div class="form-group hidden" id="otherResidenceGroup">
+          <label>具体的な在留資格 / Chi tiết <span class="required">*</span></label>
+          <input type="text" id="otherResidence" placeholder="例: 技能">
+        </div>
+
+        <div class="form-group">
+          <label>都道府県 / Tỉnh thành <span class="required">*</span></label>
+          <select id="prefecture" required>
+            <option value="">選択してください / Vui lòng chọn</option>
+            <option value="北海道">北海道</option>
+            <option value="青森県">青森県</option>
+            <option value="岩手県">岩手県</option>
+            <option value="宮城県">宮城県</option>
+            <option value="秋田県">秋田県</option>
+            <option value="山形県">山形県</option>
+            <option value="福島県">福島県</option>
+            <option value="茨城県">茨城県</option>
+            <option value="栃木県">栃木県</option>
+            <option value="群馬県">群馬県</option>
+            <option value="埼玉県">埼玉県</option>
+            <option value="千葉県">千葉県</option>
+            <option value="東京都">東京都</option>
+            <option value="神奈川県">神奈川県</option>
+            <option value="新潟県">新潟県</option>
+            <option value="富山県">富山県</option>
+            <option value="石川県">石川県</option>
+            <option value="福井県">福井県</option>
+            <option value="山梨県">山梨県</option>
+            <option value="長野県">長野県</option>
+            <option value="岐阜県">岐阜県</option>
+            <option value="静岡県">静岡県</option>
+            <option value="愛知県">愛知県</option>
+            <option value="三重県">三重県</option>
+            <option value="滋賀県">滋賀県</option>
+            <option value="京都府">京都府</option>
+            <option value="大阪府">大阪府</option>
+            <option value="兵庫県">兵庫県</option>
+            <option value="奈良県">奈良県</option>
+            <option value="和歌山県">和歌山県</option>
+            <option value="鳥取県">鳥取県</option>
+            <option value="島根県">島根県</option>
+            <option value="岡山県">岡山県</option>
+            <option value="広島県">広島県</option>
+            <option value="山口県">山口県</option>
+            <option value="徳島県">徳島県</option>
+            <option value="香川県">香川県</option>
+            <option value="愛媛県">愛媛県</option>
+            <option value="高知県">高知県</option>
+            <option value="福岡県">福岡県</option>
+            <option value="佐賀県">佐賀県</option>
+            <option value="長崎県">長崎県</option>
+            <option value="熊本県">熊本県</option>
+            <option value="大分県">大分県</option>
+            <option value="宮崎県">宮崎県</option>
+            <option value="鹿児島県">鹿児島県</option>
+            <option value="沖縄県">沖縄県</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>言語 / Ngôn ngữ</label>
+          <div class="language-toggle">
+            <input type="radio" name="language" value="ja" id="langJa">
+            <label for="langJa">🇯🇵 日本語</label>
+            
+            <input type="radio" name="language" value="vi" id="langVi" checked>
+            <label for="langVi">🇻🇳 Tiếng Việt</label>
+          </div>
+        </div>
+
+        <button type="submit" class="save-btn" id="saveBtn">
+          💾 保存する / Lưu
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const LIFF_ID = '2008551240-lQ0qWLdx';
+    let userId = null;
+
+    // LIFF初期化
+    async function initializeLiff() {
+      try {
+        await liff.init({ liffId: LIFF_ID });
+        
+        if (!liff.isLoggedIn()) {
+          liff.login();
+          return;
+        }
+
+        // ユーザー情報取得
+        const profile = await liff.getProfile();
+        userId = profile.userId;
+
+        // プロフィールデータ取得
+        await loadProfile();
+
+        // UI表示
+        document.getElementById('loading').classList.add('hidden');
+        document.getElementById('content').classList.remove('hidden');
+
+      } catch (error) {
+        console.error('LIFF initialization failed', error);
+        showError('初期化に失敗しました / Khởi tạo thất bại');
+      }
+    }
+
+    // プロフィールデータ取得
+    async function loadProfile() {
+      try {
+        const response = await fetch(`/api/get-profile?userId=${userId}`);
+        const data = await response.json();
+
+        if (data.success) {
+          const user = data.user;
+          
+          // フォームに値を設定
+          document.getElementById('name').value = user.preferred_name || '';
+          document.getElementById('japaneseLevel').value = user.japanese_level || '';
+          document.getElementById('prefecture').value = user.prefecture || '';
+          
+          // 在留資格
+          if (user.residence_status) {
+            const options = Array.from(document.getElementById('residenceStatus').options);
+            const matchedOption = options.find(opt => opt.value === user.residence_status);
+            
+            if (matchedOption) {
+              document.getElementById('residenceStatus').value = user.residence_status;
+            } else {
+              // その他の場合
+              document.getElementById('residenceStatus').value = 'その他';
+              document.getElementById('otherResidence').value = user.residence_status;
+              document.getElementById('otherResidenceGroup').classList.remove('hidden');
+            }
+          }
+
+          // 言語設定
+          const language = user.language || 'vi';
+          document.getElementById(language === 'ja' ? 'langJa' : 'langVi').checked = true;
+
+          // 利用状況
+          const limit = user.plan === 'premium' ? '無制限' : '10';
+          document.getElementById('usageCount').textContent = `${user.usage_count || 0}/${limit}回`;
+          document.getElementById('plan').textContent = user.plan === 'premium' ? 'プレミアム / Premium' : '無料 / Free';
+          document.getElementById('totalUsage').textContent = `${user.total_usage_count || 0}回`;
+        }
+      } catch (error) {
+        console.error('Failed to load profile', error);
+        showError('プロフィールの読み込みに失敗しました / Tải dữ liệu thất bại');
+      }
+    }
+
+    // 在留資格の「その他」選択時の処理
+    document.getElementById('residenceStatus').addEventListener('change', function(e) {
+      const otherGroup = document.getElementById('otherResidenceGroup');
+      if (e.target.value === 'その他') {
+        otherGroup.classList.remove('hidden');
+        document.getElementById('otherResidence').required = true;
+      } else {
+        otherGroup.classList.add('hidden');
+        document.getElementById('otherResidence').required = false;
+      }
+    });
+
+    // フォーム送信
+    document.getElementById('profileForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+
+      const saveBtn = document.getElementById('saveBtn');
+      saveBtn.disabled = true;
+      saveBtn.textContent = '保存中... / Đang lưu...';
+
+      // フォームデータ取得
+      const residenceStatus = document.getElementById('residenceStatus').value;
+      const otherResidence = document.getElementById('otherResidence').value;
+
+      const formData = {
+        userId: userId,
+        preferred_name: document.getElementById('name').value.trim(),
+        japanese_level: document.getElementById('japaneseLevel').value,
+        residence_status: residenceStatus === 'その他' ? otherResidence.trim() : residenceStatus,
+        prefecture: document.getElementById('prefecture').value,
+        language: document.querySelector('input[name="language"]:checked').value,
+      };
+
+      // バリデーション
+      if (!formData.preferred_name || !formData.residence_status || !formData.prefecture) {
+        showError('必須項目を入力してください / Vui lòng điền đầy đủ thông tin');
+        saveBtn.disabled = false;
+        saveBtn.textContent = '💾 保存する / Lưu';
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/update-profile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData),
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          showSuccess('保存しました！ / Đã lưu!');
+          
+          // 1.5秒後にLIFFを閉じる
+          setTimeout(() => {
+            liff.closeWindow();
+          }, 1500);
+        } else {
+          throw new Error(result.error);
+        }
+      } catch (error) {
+        console.error('Failed to save profile', error);
+        showError('保存に失敗しました / Lưu thất bại: ' + error.message);
+        saveBtn.disabled = false;
+        saveBtn.textContent = '💾 保存する / Lưu';
+      }
+    });
+
+    function showError(message) {
+      const errorEl = document.getElementById('errorMessage');
+      errorEl.textContent = message;
+      errorEl.classList.remove('hidden');
+      setTimeout(() => errorEl.classList.add('hidden'), 5000);
+    }
+
+    function showSuccess(message) {
+      const successEl = document.getElementById('successMessage');
+      successEl.textContent = message;
+      successEl.classList.remove('hidden');
+    }
+
+    // LIFF初期化実行
+    initializeLiff();
+  </script>
+</body>
+</html>
