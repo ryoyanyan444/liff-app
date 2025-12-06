@@ -66,7 +66,7 @@ const AREAS_VI = [
   { 
     label: 'Trang của tôi', 
     bounds: { x: 2198, y: 1461, width: 302, height: 226 }, 
-    action: { type: 'message', text: 'マイページ(準備中)' } 
+  action: { type: 'uri', uri: 'https://liff.line.me/2008551240-lQ0qWLdx' }
   },
 ];
 
@@ -124,7 +124,8 @@ const AREAS_JA = [
   { 
     label: 'マイページ', 
     bounds: { x: 2198, y: 1461, width: 302, height: 226 }, 
-    action: { type: 'message', text: 'マイページ(準備中)' } 
+    action: { type: 'uri', uri: 'https://liff.line.me/2008551240-lQ0qWLdx' }
+ 
   },
 ];
 
@@ -133,6 +134,7 @@ const RICH_MENUS = [
     name: 'Miu Menu (Tiếng Việt - Chưa hoàn thành)',
     language: 'vi',
     status: 'incomplete',
+    chatBarText: 'Thực đơn',  // ベトナム語
     imagePath: './rich_main_vi.png',
     areas: AREAS_VI,
   },
@@ -140,6 +142,7 @@ const RICH_MENUS = [
     name: 'Miu Menu (Tiếng Việt - Hoàn thành)',
     language: 'vi',
     status: 'complete',
+    chatBarText: 'Thực đơn',  // ベトナム語
     imagePath: './rich_main_vi_complete.png',
     areas: AREAS_VI,
   },
@@ -147,6 +150,7 @@ const RICH_MENUS = [
     name: 'Miu メインメニュー (日本語 - 未入力)',
     language: 'ja',
     status: 'incomplete',
+    chatBarText: 'メニュー',  // 日本語
     imagePath: './rich_main_ja.png',
     areas: AREAS_JA,
   },
@@ -154,6 +158,7 @@ const RICH_MENUS = [
     name: 'Miu メインメニュー (日本語 - 完了)',
     language: 'ja',
     status: 'complete',
+    chatBarText: 'メニュー',  // 日本語
     imagePath: './rich_main_ja_complete.png',
     areas: AREAS_JA,
   },
@@ -183,15 +188,13 @@ async function setupAllRichMenus() {
         size: { width: 2500, height: 1686 },
         selected: false,
         name: menu.name,
-        chatBarText: 'メニュー',
+        chatBarText: menu.chatBarText,  // 言語ごとに変更
         areas: menu.areas,
       });
 
       // レスポンスからrichMenuIdを抽出
       const richMenuId = response.richMenuId || response;
       console.log(`✅ Rich menu created: ${richMenuId}`);
-      console.log(`   Response type: ${typeof response}`);
-      console.log(`   Response keys: ${Object.keys(response || {}).join(', ')}`);
 
       // 画像をアップロード
       const imageBuffer = fs.readFileSync(menu.imagePath);
@@ -214,8 +217,6 @@ async function setupAllRichMenus() {
       console.error(`❌ Error creating ${menu.name}:`);
       console.error('Error type:', error.constructor.name);
       console.error('Status:', error.response?.status);
-      console.error('Status text:', error.response?.statusText);
-      console.error('Response data:', JSON.stringify(error.response?.data, null, 2));
       console.error('Message:', error.message);
       
       const key = `${menu.language}_${menu.status}`;
