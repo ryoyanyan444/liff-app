@@ -1,4 +1,5 @@
-﻿const line = require('@line/bot-sdk');
+﻿const axios = require('axios');
+const line = require('@line/bot-sdk');
 const { OpenAI } = require('openai');
 const { createClient } = require('@supabase/supabase-js');
 
