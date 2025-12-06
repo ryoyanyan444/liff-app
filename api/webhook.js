@@ -1584,11 +1584,11 @@ async function handleImageProcessing(messageId, mode, user, replyToken, userId) 
   await supabase
     .from('users')
     .update({ 
-      temp_image_base64: base64Image,
+      temp_image_base64: base64Image,  // ✅ conversation_history の行を削除
       temp_image_timestamp: new Date().toISOString()
     })
     .eq('user_id', userId);
-  
+
   console.log('✅ Image temporarily saved for follow-up');
 } catch (saveError) {
   console.error('❌ Failed to save temporary image:', saveError);
