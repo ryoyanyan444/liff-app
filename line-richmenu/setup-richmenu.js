@@ -1,196 +1,245 @@
-const axios = require('axios');
+const line = require('@line/bot-sdk');
 const fs = require('fs');
+const axios = require('axios');
 
-// ========== 🔧 設定 ==========
 const CONFIG = {
   channelAccessToken: 'QaI7weNXO+oZg5b+IQRCw9RbhaQ7sNW4/KNLzkbe8n/0kNoRL/XRswxiIMGhbqHR+HccG6Y5p2nRdPkbDaRtnsmf1U/id7UEnwwfABpFyZuGzpVB0d1WLIiBwousRunQ0SGjF7PyC4GNDOg5XyQAuAdB04t89/1O/w1cDnyilFU=',
   botId: '@687hoviz',
   liffId: '2008551240-W6log3Gr',
-  imagePath: './line-richmenu/rich_main.png'
 };
 
-// ========== 📱 Rich Menu定義（9エリア構成） ==========
-const richMenuData = {
-  size: {
-    width: 2500,
-    height: 1686
+const client = new line.messagingApi.MessagingApiClient({
+  channelAccessToken: CONFIG.channelAccessToken,
+});
+
+// ベトナム語版のエリア定義
+const AREAS_VI = [
+  // 上段：テンプレート（全幅）
+  { 
+    label: 'Mẫu', 
+    bounds: { x: 0, y: 0, width: 2500, height: 283 }, 
+    action: { type: 'uri', uri: `https://liff.line.me/${CONFIG.liffId}` } 
   },
-  selected: true,
-  name: 'Miu メインメニュー',
-  chatBarText: 'メニューを開く',
-  areas: [
-    // エリア1: テンプレート (左上) - LIFF起動
-    {
-      bounds: { x: 0, y: 0, width: 834, height: 843 },
-      action: {
-        type: 'uri',
-        label: 'テンプレート',
-        uri: `https://liff.line.me/${CONFIG.liffId}`
-      }
-    },
-    
-    // エリア2: Miuとおしゃべり (中央上) - モード切替
-    {
-      bounds: { x: 834, y: 0, width: 832, height: 843 },
-      action: {
-        type: 'message',
-        label: 'Miuとおしゃべり',
-        text: '/mode miu-chat'
-      }
-    },
-    
-    // エリア3: カメラ翻訳 (右上) - カメラ起動
-    {
-      bounds: { x: 1666, y: 0, width: 834, height: 843 },
-      action: {
-        type: 'camera',
-        label: 'カメラ翻訳'
-      }
-    },
-    
-    // エリア4: 翻訳選択 (左下1) - 翻訳モード切替
-    {
-      bounds: { x: 0, y: 843, width: 625, height: 843 },
-      action: {
-        type: 'message',
-        label: '翻訳選択',
-        text: '/mode translate'
-      }
-    },
-    
-    // エリア5: 返信作成 (左下2)
-    {
-      bounds: { x: 625, y: 843, width: 625, height: 843 },
-      action: {
-        type: 'message',
-        label: '返信作成',
-        text: '返信作成'
-      }
-    },
-    
-    // エリア6: キーボード展開 (中央下1) - ポストバック
-    {
-      bounds: { x: 1250, y: 843, width: 417, height: 843 },
-      action: {
-        type: 'postback',
-        label: 'キーボード展開',
-        data: 'action=openKeyboard',
-        inputOption: 'openKeyboard'
-      }
-    },
-    
-    // エリア7: 音声メッセージ (中央下2) - ポストバック
-    {
-      bounds: { x: 1667, y: 843, width: 416, height: 843 },
-      action: {
-        type: 'postback',
-        label: '音声メッセージ',
-        data: 'action=openVoice',
-        inputOption: 'openVoice'
-      }
-    },
-    
-    // エリア8: シェア (右下1) - URI
-    {
-      bounds: { x: 2083, y: 843, width: 417, height: 843 },
-      action: {
-        type: 'uri',
-        label: 'シェア',
-        uri: `https://line.me/R/nv/recommendOA/${CONFIG.botId}`
-      }
-    },
-    
-    // エリア9: マイページ (右上端) - 準備中
-    {
-      bounds: { x: 2083, y: 0, width: 417, height: 843 },
-      action: {
-        type: 'message',
-        label: 'マイページ',
-        text: 'マイページ(準備中)'
-      }
-    }
-  ]
-};
+  // 中段左：Miuとおしゃべり
+  { 
+    label: 'Trò chuyện với Miu', 
+    bounds: { x: 0, y: 283, width: 867, height: 1176 }, 
+    action: { type: 'message', text: '/mode miu-chat' } 
+  },
+  // 中段中央：カメラ翻訳
+  { 
+    label: 'Dịch bằng camera', 
+    bounds: { x: 867, y: 283, width: 815, height: 1176 }, 
+    action: { type: 'message', text: '/camera-translate' } 
+  },
+  // 中段右上：テキスト翻訳
+  { 
+    label: 'Dịch văn bản', 
+    bounds: { x: 1682, y: 284, width: 817, height: 579 }, 
+    action: { type: 'message', text: '/mode translate' } 
+  },
+  // 中段右下：返信文作成
+  { 
+    label: 'Tạo câu trả lời', 
+    bounds: { x: 1682, y: 863, width: 817, height: 597 }, 
+    action: { type: 'message', text: '/mode reply' } 
+  },
+  // 下段左：キーボード展開
+  { 
+    label: 'Mở bàn phím', 
+    bounds: { x: 0, y: 1460, width: 1435, height: 226 }, 
+    action: { type: 'postback', data: 'action=openKeyboard', inputOption: 'openKeyboard' } 
+  },
+  // 下段中央：音声メッセージ
+  { 
+    label: 'Tin nhắn thoại', 
+    bounds: { x: 1435, y: 1463, width: 247, height: 226 }, 
+    action: { type: 'postback', data: 'action=openVoice', inputOption: 'openVoice' } 
+  },
+  // 下段右から2番目：シェア
+  { 
+    label: 'Chia sẻ', 
+    bounds: { x: 1682, y: 1461, width: 516, height: 226 }, 
+    action: { type: 'uri', uri: `https://line.me/R/nv/recommendOA/${CONFIG.botId}` } 
+  },
+  // 下段右端：マイページ
+  { 
+    label: 'Trang của tôi', 
+    bounds: { x: 2198, y: 1461, width: 302, height: 226 }, 
+    action: { type: 'message', text: 'マイページ(準備中)' } 
+  },
+];
 
-// ========== 🚀 メイン処理 ==========
-async function setupRichMenu() {
-  console.log('🚀 Miu Bot Rich Menu Setup Start\n');
-  
-  const headers = {
-    'Authorization': `Bearer ${CONFIG.channelAccessToken}`,
-    'Content-Type': 'application/json'
-  };
-  
+// 日本語版のエリア定義
+const AREAS_JA = [
+  // 上段：テンプレート（全幅）
+  { 
+    label: 'テンプレート', 
+    bounds: { x: 0, y: 0, width: 2500, height: 283 }, 
+    action: { type: 'uri', uri: `https://liff.line.me/${CONFIG.liffId}` } 
+  },
+  // 中段左：Miuとおしゃべり
+  { 
+    label: 'Miuとはなす', 
+    bounds: { x: 0, y: 283, width: 867, height: 1176 }, 
+    action: { type: 'message', text: '/mode miu-chat' } 
+  },
+  // 中段中央：カメラ翻訳
+  { 
+    label: 'ほんやくする（カメラ）', 
+    bounds: { x: 867, y: 283, width: 815, height: 1176 }, 
+    action: { type: 'message', text: '/camera-translate' } 
+  },
+  // 中段右上：テキスト翻訳
+  { 
+    label: 'ほんやくする（テキスト）', 
+    bounds: { x: 1682, y: 284, width: 817, height: 579 }, 
+    action: { type: 'message', text: '/mode translate' } 
+  },
+  // 中段右下：返信文作成
+  { 
+    label: 'へんしんぶんをつくる', 
+    bounds: { x: 1682, y: 863, width: 817, height: 597 }, 
+    action: { type: 'message', text: '/mode reply' } 
+  },
+  // 下段左：キーボード展開
+  { 
+    label: 'キーボードをひらく', 
+    bounds: { x: 0, y: 1460, width: 1435, height: 226 }, 
+    action: { type: 'postback', data: 'action=openKeyboard', inputOption: 'openKeyboard' } 
+  },
+  // 下段中央：音声メッセージ
+  { 
+    label: 'おんせいメッセージ', 
+    bounds: { x: 1435, y: 1463, width: 247, height: 226 }, 
+    action: { type: 'postback', data: 'action=openVoice', inputOption: 'openVoice' } 
+  },
+  // 下段右から2番目：シェア
+  { 
+    label: 'ともだちにシェア', 
+    bounds: { x: 1682, y: 1461, width: 516, height: 226 }, 
+    action: { type: 'uri', uri: `https://line.me/R/nv/recommendOA/${CONFIG.botId}` } 
+  },
+  // 下段右端：マイページ
+  { 
+    label: 'マイページ', 
+    bounds: { x: 2198, y: 1461, width: 302, height: 226 }, 
+    action: { type: 'message', text: 'マイページ(準備中)' } 
+  },
+];
+
+const RICH_MENUS = [
+  {
+    name: 'Miu Menu (Tiếng Việt - Chưa hoàn thành)',
+    language: 'vi',
+    status: 'incomplete',
+    imagePath: './rich_main_vi.png',
+    areas: AREAS_VI,
+  },
+  {
+    name: 'Miu Menu (Tiếng Việt - Hoàn thành)',
+    language: 'vi',
+    status: 'complete',
+    imagePath: './rich_main_vi_complete.png',
+    areas: AREAS_VI,
+  },
+  {
+    name: 'Miu メインメニュー (日本語 - 未入力)',
+    language: 'ja',
+    status: 'incomplete',
+    imagePath: './rich_main_ja.png',
+    areas: AREAS_JA,
+  },
+  {
+    name: 'Miu メインメニュー (日本語 - 完了)',
+    language: 'ja',
+    status: 'complete',
+    imagePath: './rich_main_ja_complete.png',
+    areas: AREAS_JA,
+  },
+];
+
+async function setupAllRichMenus() {
+  console.log('🚀 Miu Bot Rich Menu Setup (4 versions) Start...\n');
+
   try {
-    // 既存のデフォルトリッチメニューを削除
-    console.log('🗑️  Removing old default rich menu...');
-    try {
-      await axios.delete(
-        'https://api.line.me/v2/bot/user/all/richmenu',
-        { headers }
-      );
-      console.log('✅ Old menu removed\n');
-    } catch (e) {
-      console.log('ℹ️  No existing default menu\n');
+    const defaultMenuId = await client.getDefaultRichMenuId();
+    if (defaultMenuId) {
+      await client.cancelDefaultRichMenu();
+      console.log('✅ Removed old default rich menu\n');
     }
-
-    // 新しいリッチメニューを作成
-    console.log('📱 Creating new Rich Menu...');
-    const response = await axios.post(
-      'https://api.line.me/v2/bot/richmenu',
-      richMenuData,
-      { headers }
-    );
-    const richMenuId = response.data.richMenuId;
-    console.log(`✅ Created: ${richMenuId}\n`);
-    
-    // 画像をアップロード
-    console.log('🖼️  Uploading image...');
-    const imageBuffer = fs.readFileSync(CONFIG.imagePath);
-    await axios.post(
-      `https://api-data.line.me/v2/bot/richmenu/${richMenuId}/content`,
-      imageBuffer,
-      {
-        headers: {
-          'Authorization': headers.Authorization,
-          'Content-Type': 'image/png'
-        }
-      }
-    );
-    console.log('✅ Image uploaded\n');
-    
-    // デフォルトとして設定
-    console.log('⚙️  Setting as default...');
-    await axios.post(
-      `https://api.line.me/v2/bot/user/all/richmenu/${richMenuId}`,
-      {},
-      { headers }
-    );
-    console.log('✅ Set as default\n');
-    
-    console.log('🎉 COMPLETE! Check your LINE app!');
-    console.log(`📋 Rich Menu ID: ${richMenuId}`);
-    console.log('\n📱 メニュー構成（9エリア）:');
-    console.log('  1. テンプレート (左上) → LIFF起動');
-    console.log('  2. Miuとおしゃべり (中央上) → /mode miu-chat');
-    console.log('  3. カメラ翻訳 (右上) → カメラ起動 📷');
-    console.log('  4. 翻訳選択 (左下1) → /mode translate');
-    console.log('  5. 返信作成 (左下2) → メッセージ送信');
-    console.log('  6. キーボード展開 (中央下1) → キーボード直接起動 ⌨️');
-    console.log('  7. 音声メッセージ (中央下2) → 音声入力直接起動 🎤');
-    console.log('  8. シェア (右下1) → ボット紹介ページ');
-    console.log('  9. マイページ (右上端) → 準備中');
-    
-  } catch (error) {
-    console.error('\n❌ Error occurred:');
-    if (error.response) {
-      console.error('Status:', error.response.status);
-      console.error('Data:', JSON.stringify(error.response.data, null, 2));
-    } else {
-      console.error(error.message);
-    }
-    process.exit(1);
+  } catch (err) {
+    console.log('ℹ️ No default rich menu found\n');
   }
+
+  const results = {};
+
+  for (const menu of RICH_MENUS) {
+    console.log(`📋 Creating: ${menu.name}...`);
+
+    try {
+      // createRichMenuの戻り値を正しく取得
+      const response = await client.createRichMenu({
+        size: { width: 2500, height: 1686 },
+        selected: false,
+        name: menu.name,
+        chatBarText: 'メニュー',
+        areas: menu.areas,
+      });
+
+      // レスポンスからrichMenuIdを抽出
+      const richMenuId = response.richMenuId || response;
+      console.log(`✅ Rich menu created: ${richMenuId}`);
+      console.log(`   Response type: ${typeof response}`);
+      console.log(`   Response keys: ${Object.keys(response || {}).join(', ')}`);
+
+      // 画像をアップロード
+      const imageBuffer = fs.readFileSync(menu.imagePath);
+      await axios.post(
+        `https://api-data.line.me/v2/bot/richmenu/${richMenuId}/content`,
+        imageBuffer,
+        {
+          headers: {
+            'Content-Type': 'image/png',
+            Authorization: `Bearer ${CONFIG.channelAccessToken}`,
+          },
+        }
+      );
+
+      console.log(`✅ Image uploaded: ${menu.imagePath}\n`);
+
+      const key = `${menu.language}_${menu.status}`;
+      results[key] = richMenuId;
+    } catch (error) {
+      console.error(`❌ Error creating ${menu.name}:`);
+      console.error('Error type:', error.constructor.name);
+      console.error('Status:', error.response?.status);
+      console.error('Status text:', error.response?.statusText);
+      console.error('Response data:', JSON.stringify(error.response?.data, null, 2));
+      console.error('Message:', error.message);
+      
+      const key = `${menu.language}_${menu.status}`;
+      results[key] = 'FAILED';
+    }
+  }
+
+  if (results.vi_incomplete && results.vi_incomplete !== 'FAILED') {
+    try {
+      await client.setDefaultRichMenu(results.vi_incomplete);
+      console.log('✅ Set default rich menu: ベトナム語・未入力版\n');
+    } catch (err) {
+      console.error('❌ Failed to set default rich menu:', err.message);
+    }
+  }
+
+  console.log('🎉 COMPLETE! Rich Menu IDs:\n');
+  console.log('========================================');
+  console.log(`RICH_MENU_VI_INCOMPLETE_ID=${results.vi_incomplete || 'FAILED'}`);
+  console.log(`RICH_MENU_VI_COMPLETE_ID=${results.vi_complete || 'FAILED'}`);
+  console.log(`RICH_MENU_JA_INCOMPLETE_ID=${results.ja_incomplete || 'FAILED'}`);
+  console.log(`RICH_MENU_JA_COMPLETE_ID=${results.ja_complete || 'FAILED'}`);
+  console.log('========================================\n');
+  console.log('✅ 上記の4つのIDをVercelの環境変数に追加してください！');
 }
 
-setupRichMenu();
+setupAllRichMenus();
